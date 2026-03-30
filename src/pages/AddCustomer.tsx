@@ -1,13 +1,27 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, UserPlus, Search, Phone, MapPin, Building2, CheckCircle2, X, Loader2, Edit2, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  UserPlus,
+  Search,
+  Phone,
+  MapPin,
+  Building2,
+  CheckCircle2,
+  X,
+  Loader2,
+  Edit2,
+  Trash2,
+} from "lucide-react";
 import api from "../utils/api";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
+import axios from "axios";
 
 type Party = {
   id: number;
   name: string;
   mobile: string | null;
   address: string | null;
+  gst_number?: string;
   type: "customer" | "supplier" | "both";
   opening_balance: number;
   status: "active" | "inactive";
@@ -19,13 +33,19 @@ type AddCustomerProps = {
   initialShowForm?: boolean;
 };
 
-export default function AddCustomer({ onBack, onViewLedger, initialShowForm = false }: AddCustomerProps) {
+export default function AddCustomer({
+  onBack,
+  onViewLedger,
+  initialShowForm = false,
+}: AddCustomerProps) {
   const [showForm, setShowForm] = useState(!!initialShowForm);
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "customer" | "supplier" | "both">("all");
-  
+  const [filterType, setFilterType] = useState<
+    "all" | "customer" | "supplier" | "both"
+  >("all");
+
   // Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -54,12 +74,12 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
   const fetchParties = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/parties');
+      const response = await api.get("/parties");
       if (response.data.success) {
         setParties(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching parties:', error);
+      console.error("Error fetching parties:", error);
     } finally {
       setLoading(false);
     }
@@ -67,16 +87,23 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
     }
-    if (formData.mobile && formData.mobile.length > 0 && formData.mobile.length !== 10) {
+    if (
+      formData.mobile &&
+      formData.mobile.length > 0 &&
+      formData.mobile.length !== 10
+    ) {
       newErrors.mobile = "Mobile number must be 10 digits";
     }
-    if (formData.opening_balance && isNaN(parseFloat(formData.opening_balance))) {
+    if (
+      formData.opening_balance &&
+      isNaN(parseFloat(formData.opening_balance))
+    ) {
       newErrors.opening_balance = "Invalid amount";
     }
 
@@ -95,7 +122,9 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
         address: formData.address || null,
         gst_number: formData.gst_number || null,
         type: formData.type,
-        opening_balance: formData.opening_balance ? parseFloat(formData.opening_balance) : 0,
+        opening_balance: formData.opening_balance
+          ? parseFloat(formData.opening_balance)
+          : 0,
         status: formData.status,
       };
 
@@ -104,19 +133,26 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
         await api.put(`/parties/${editingId}`, payload);
       } else {
         // Create new party
-        await api.post('/parties', payload);
+        await api.post("/parties", payload);
       }
 
       // Reset form and refresh list
       resetForm();
       fetchParties();
-      
+
       // Trigger dashboard refresh
-      window.dispatchEvent(new CustomEvent('dashboard-refresh'));
-    } catch (error: any) {
-      setErrors({
-        submit: error.response?.data?.message || 'Failed to save customer. Please try again.'
-      });
+      window.dispatchEvent(new CustomEvent("dashboard-refresh"));
+    } catch (e: unknown) {
+      console.error(e);
+      if (e instanceof Error) {
+        setErrors({
+          submit: e.message,
+        });
+      } else {
+        setErrors({
+          submit: "Failed to save customer. Please try again.",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -143,7 +179,7 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
       name: party.name,
       mobile: party.mobile || "",
       address: party.address || "",
-      gst_number: (party as any).gst_number || "",
+      gst_number: party.gst_number || "",
       type: party.type,
       opening_balance: party.opening_balance.toString(),
       status: party.status,
@@ -157,23 +193,26 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
     setDeletingId(party.id);
     setDeletingName(party.name);
     setCheckingRelations(true);
-    
+
     try {
       // Fetch party details with counts
       const response = await api.get(`/parties/${party.id}`);
       if (response.data.success) {
         const partyData = response.data.data;
         // Use counts from backend if available, otherwise count arrays
-        const txCount = partyData.transactions_count ?? (partyData.transactions?.length || 0);
-        const invCount = partyData.invoices_count ?? (partyData.invoices?.length || 0);
-        const payCount = partyData.payments_count ?? (partyData.payments?.length || 0);
-        
+        const txCount =
+          partyData.transactions_count ?? (partyData.transactions?.length || 0);
+        const invCount =
+          partyData.invoices_count ?? (partyData.invoices?.length || 0);
+        const payCount =
+          partyData.payments_count ?? (partyData.payments?.length || 0);
+
         setTransactionCount(txCount);
         setInvoiceCount(invCount);
         setPaymentCount(payCount);
       }
     } catch (error) {
-      console.error('Error checking relations:', error);
+      console.error("Error checking relations:", error);
       // If error, still allow deletion but show warning
       setTransactionCount(0);
       setInvoiceCount(0);
@@ -186,12 +225,12 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
 
   const handleDeleteConfirm = async () => {
     if (!deletingId) return;
-    
+
     try {
       const response = await api.delete(`/parties/${deletingId}`);
       fetchParties();
-      window.dispatchEvent(new CustomEvent('dashboard-refresh'));
-      
+      window.dispatchEvent(new CustomEvent("dashboard-refresh"));
+
       // Show success message with deleted counts
       if (response.data?.data) {
         const deleted = response.data.data;
@@ -205,35 +244,42 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
         if (deleted.deleted_payments > 0) {
           deletedItems.push(`${deleted.deleted_payments} payment(s)`);
         }
-        
+
         if (deletedItems.length > 0) {
-          console.log(`Deleted: ${deletedItems.join(', ')}`);
+          console.log(`Deleted: ${deletedItems.join(", ")}`);
         }
       }
-      
+
       setDeleteModalOpen(false);
       setDeletingId(null);
       setDeletingName("");
       setTransactionCount(0);
       setInvoiceCount(0);
       setPaymentCount(0);
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete customer');
+    } catch (e: unknown) {
+      if (axios.isAxiosError(e)) {
+        alert(e.response?.data?.message || "Failed to delete customer");
+      } else {
+        alert("Failed to delete customer");
+      }
     }
   };
 
-  const filteredParties = parties.filter(party => {
-    const matchesSearch = party.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredParties = parties.filter((party) => {
+    const matchesSearch =
+      party.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (party.mobile && party.mobile.includes(searchQuery));
-    const matchesType = filterType === "all" || party.type === filterType || 
+    const matchesType =
+      filterType === "all" ||
+      party.type === filterType ||
       (filterType === "both" && party.type === "both");
     return matchesSearch && matchesType;
   });
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
@@ -250,7 +296,11 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
           <ArrowLeft className="w-5 h-5 text-[#111827] dark:text-white" />
         </button>
         <h1 className="text-lg font-bold text-[#111827] dark:text-white flex-1">
-          {showForm ? (editingId ? "Edit Customer" : "Add Customer") : "Customers"}
+          {showForm
+            ? editingId
+              ? "Edit Customer"
+              : "Add Customer"
+            : "Customers"}
         </h1>
         {!showForm && (
           <button
@@ -294,7 +344,9 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
                 } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.name}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.name}
+                </p>
               )}
             </div>
 
@@ -311,7 +363,10 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
                   maxLength={10}
                   value={formData.mobile}
                   onChange={(e) => {
-                    setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, "") });
+                    setFormData({
+                      ...formData,
+                      mobile: e.target.value.replace(/\D/g, ""),
+                    });
                     if (errors.mobile) setErrors({ ...errors, mobile: "" });
                   }}
                   placeholder="Enter mobile number"
@@ -319,7 +374,9 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
                 />
               </div>
               {errors.mobile && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.mobile}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.mobile}
+                </p>
               )}
             </div>
 
@@ -332,7 +389,9 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
                 <MapPin className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500 mt-1" />
                 <textarea
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                   placeholder="Enter address"
                   rows={3}
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none"
@@ -348,7 +407,12 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
               <input
                 type="text"
                 value={formData.gst_number}
-                onChange={(e) => setFormData({ ...formData, gst_number: e.target.value.toUpperCase() })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    gst_number: e.target.value.toUpperCase(),
+                  })
+                }
                 placeholder="15-digit GST number (optional)"
                 maxLength={15}
                 className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
@@ -390,15 +454,21 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
                   inputMode="decimal"
                   value={formData.opening_balance}
                   onChange={(e) => {
-                    setFormData({ ...formData, opening_balance: e.target.value.replace(/[^0-9.-]/g, "") });
-                    if (errors.opening_balance) setErrors({ ...errors, opening_balance: "" });
+                    setFormData({
+                      ...formData,
+                      opening_balance: e.target.value.replace(/[^0-9.-]/g, ""),
+                    });
+                    if (errors.opening_balance)
+                      setErrors({ ...errors, opening_balance: "" });
                   }}
                   placeholder="0.00 (Positive = they owe you, Negative = you owe them)"
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
               {errors.opening_balance && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.opening_balance}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.opening_balance}
+                </p>
               )}
             </div>
 
@@ -427,7 +497,9 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
 
             {errors.submit && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {errors.submit}
+                </p>
               </div>
             )}
 
@@ -470,19 +542,21 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
               />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-              {(["all", "customer", "supplier", "both"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setFilterType(type)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                    filterType === type
-                      ? "bg-[#22C55E] dark:bg-green-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 text-[#374151] dark:text-gray-300"
-                  }`}
-                >
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </button>
-              ))}
+              {(["all", "customer", "supplier", "both"] as const).map(
+                (type) => (
+                  <button
+                    key={type}
+                    onClick={() => setFilterType(type)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                      filterType === type
+                        ? "bg-[#22C55E] dark:bg-green-600 text-white"
+                        : "bg-gray-100 dark:bg-gray-800 text-[#374151] dark:text-gray-300"
+                    }`}
+                  >
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
+                ),
+              )}
             </div>
           </div>
 
@@ -495,8 +569,12 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
             ) : filteredParties.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <UserPlus className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">No customers found</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Add your first customer to get started</p>
+                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">
+                  No customers found
+                </p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  Add your first customer to get started
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -512,13 +590,15 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
                           <h3 className="text-base font-bold text-[#111827] dark:text-white truncate">
                             {party.name}
                           </h3>
-                          <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${
-                            party.type === "customer"
-                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                              : party.type === "supplier"
-                              ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
-                              : "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
-                          }`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-lg text-xs font-medium ${
+                              party.type === "customer"
+                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                                : party.type === "supplier"
+                                  ? "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
+                                  : "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
+                            }`}
+                          >
                             {party.type}
                           </span>
                           {party.status === "inactive" && (
@@ -536,17 +616,23 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
                         {party.address && (
                           <div className="flex items-start gap-2 text-sm text-[#6B7280] dark:text-gray-400 mb-2">
                             <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                            <span className="line-clamp-2">{party.address}</span>
+                            <span className="line-clamp-2">
+                              {party.address}
+                            </span>
                           </div>
                         )}
                         {party.opening_balance !== 0 && (
                           <div className="text-sm">
-                            <span className="text-[#6B7280] dark:text-gray-400">Opening Balance: </span>
-                            <span className={`font-semibold ${
-                              party.opening_balance > 0
-                                ? "text-[#16A34A] dark:text-green-400"
-                                : "text-[#DC2626] dark:text-red-400"
-                            }`}>
+                            <span className="text-[#6B7280] dark:text-gray-400">
+                              Opening Balance:{" "}
+                            </span>
+                            <span
+                              className={`font-semibold ${
+                                party.opening_balance > 0
+                                  ? "text-[#16A34A] dark:text-green-400"
+                                  : "text-[#DC2626] dark:text-red-400"
+                              }`}
+                            >
                               {formatAmount(Math.abs(party.opening_balance))}
                             </span>
                           </div>
@@ -598,4 +684,3 @@ export default function AddCustomer({ onBack, onViewLedger, initialShowForm = fa
     </div>
   );
 }
-

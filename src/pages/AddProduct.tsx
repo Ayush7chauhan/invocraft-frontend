@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Package, Search, DollarSign, AlertTriangle, CheckCircle2, X, Loader2, Edit2, Trash2, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  Package,
+  Search,
+  DollarSign,
+  AlertTriangle,
+  CheckCircle2,
+  X,
+  Loader2,
+  Edit2,
+  Trash2,
+  Plus,
+} from "lucide-react";
 import api from "../utils/api";
 
 type Product = {
@@ -21,7 +33,11 @@ type AddProductProps = {
 
 type ApiCategory = { id: number; name: string };
 
-export default function AddProduct({ onBack, initialShowLowStock, initialShowForm = false }: AddProductProps) {
+export default function AddProduct({
+  onBack,
+  initialShowLowStock,
+  initialShowForm = false,
+}: AddProductProps) {
   const [showForm, setShowForm] = useState(!!initialShowForm);
   const [products, setProducts] = useState<Product[]>([]);
   const [apiCategories, setApiCategories] = useState<ApiCategory[]>([]);
@@ -67,12 +83,12 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/products');
+      const response = await api.get("/products");
       if (response.data.success) {
         setProducts(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error("Error fetching products:", error);
     } finally {
       setLoading(false);
     }
@@ -95,10 +111,19 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
     if (formData.selling_price && isNaN(parseFloat(formData.selling_price))) {
       newErrors.selling_price = "Invalid price";
     }
-    if (formData.stock_quantity && (isNaN(parseInt(formData.stock_quantity)) || parseInt(formData.stock_quantity) < 0)) {
+    if (
+      formData.stock_quantity &&
+      (isNaN(parseInt(formData.stock_quantity)) ||
+        parseInt(formData.stock_quantity) < 0)
+    ) {
       newErrors.stock_quantity = "Invalid quantity";
     }
-    if (formData.tax_rate && (isNaN(parseFloat(formData.tax_rate)) || parseFloat(formData.tax_rate) < 0 || parseFloat(formData.tax_rate) > 100)) {
+    if (
+      formData.tax_rate &&
+      (isNaN(parseFloat(formData.tax_rate)) ||
+        parseFloat(formData.tax_rate) < 0 ||
+        parseFloat(formData.tax_rate) > 100)
+    ) {
       newErrors.tax_rate = "Tax rate must be between 0-100";
     }
     if (Object.keys(newErrors).length > 0) {
@@ -116,10 +141,18 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
       const payload = {
         name: formData.name.trim(),
         category: getResolvedCategory(),
-        purchase_price: formData.purchase_price ? parseFloat(formData.purchase_price) : 0,
-        selling_price: formData.selling_price ? parseFloat(formData.selling_price) : 0,
-        stock_quantity: formData.stock_quantity ? parseInt(formData.stock_quantity) : 0,
-        low_stock_threshold: formData.low_stock_threshold ? parseInt(formData.low_stock_threshold) : 10,
+        purchase_price: formData.purchase_price
+          ? parseFloat(formData.purchase_price)
+          : 0,
+        selling_price: formData.selling_price
+          ? parseFloat(formData.selling_price)
+          : 0,
+        stock_quantity: formData.stock_quantity
+          ? parseInt(formData.stock_quantity)
+          : 0,
+        low_stock_threshold: formData.low_stock_threshold
+          ? parseInt(formData.low_stock_threshold)
+          : 10,
         tax_rate: formData.tax_rate ? parseFloat(formData.tax_rate) : 0,
       };
       if (editingId) {
@@ -134,7 +167,9 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       setErrors({
-        submit: err.response?.data?.message || "Failed to save product. Please try again.",
+        submit:
+          err.response?.data?.message ||
+          "Failed to save product. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -175,14 +210,15 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
-    
+    if (!confirm("Are you sure you want to delete this product?")) return;
+
     try {
       await api.delete(`/products/${id}`);
       fetchProducts();
-      window.dispatchEvent(new CustomEvent('dashboard-refresh'));
-    } catch (error) {
-      alert('Failed to delete product');
+      window.dispatchEvent(new CustomEvent("dashboard-refresh"));
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete product");
     }
   };
 
@@ -190,21 +226,27 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
     new Set([
       ...apiCategories.map((c) => c.name),
       ...products.map((p) => p.category).filter(Boolean),
-    ])
+    ]),
   ) as string[];
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (product.category && product.category.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory = filterCategory === "all" || product.category === filterCategory || (!product.category && filterCategory === "uncategorized");
-    const matchesLowStock = !showLowStock || product.stock_quantity <= product.low_stock_threshold;
+  const filteredProducts = products.filter((product) => {
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (product.category &&
+        product.category.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesCategory =
+      filterCategory === "all" ||
+      product.category === filterCategory ||
+      (!product.category && filterCategory === "uncategorized");
+    const matchesLowStock =
+      !showLowStock || product.stock_quantity <= product.low_stock_threshold;
     return matchesSearch && matchesCategory && matchesLowStock;
   });
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
@@ -265,7 +307,9 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                 } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.name}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.name}
+                </p>
               )}
             </div>
 
@@ -290,7 +334,9 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                 <input
                   type="text"
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
                   placeholder="e.g. Electronics, Grocery"
                   className="mt-2 w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
                 />
@@ -310,15 +356,21 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                     inputMode="decimal"
                     value={formData.purchase_price}
                     onChange={(e) => {
-                      setFormData({ ...formData, purchase_price: e.target.value.replace(/[^0-9.]/g, "") });
-                      if (errors.purchase_price) setErrors({ ...errors, purchase_price: "" });
+                      setFormData({
+                        ...formData,
+                        purchase_price: e.target.value.replace(/[^0-9.]/g, ""),
+                      });
+                      if (errors.purchase_price)
+                        setErrors({ ...errors, purchase_price: "" });
                     }}
                     placeholder="0.00"
                     className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                   />
                 </div>
                 {errors.purchase_price && (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.purchase_price}</p>
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                    {errors.purchase_price}
+                  </p>
                 )}
               </div>
               <div>
@@ -332,15 +384,21 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                     inputMode="decimal"
                     value={formData.selling_price}
                     onChange={(e) => {
-                      setFormData({ ...formData, selling_price: e.target.value.replace(/[^0-9.]/g, "") });
-                      if (errors.selling_price) setErrors({ ...errors, selling_price: "" });
+                      setFormData({
+                        ...formData,
+                        selling_price: e.target.value.replace(/[^0-9.]/g, ""),
+                      });
+                      if (errors.selling_price)
+                        setErrors({ ...errors, selling_price: "" });
                     }}
                     placeholder="0.00"
                     className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                   />
                 </div>
                 {errors.selling_price && (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.selling_price}</p>
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                    {errors.selling_price}
+                  </p>
                 )}
               </div>
             </div>
@@ -356,8 +414,12 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                   inputMode="numeric"
                   value={formData.stock_quantity}
                   onChange={(e) => {
-                    setFormData({ ...formData, stock_quantity: e.target.value.replace(/[^0-9]/g, "") });
-                    if (errors.stock_quantity) setErrors({ ...errors, stock_quantity: "" });
+                    setFormData({
+                      ...formData,
+                      stock_quantity: e.target.value.replace(/[^0-9]/g, ""),
+                    });
+                    if (errors.stock_quantity)
+                      setErrors({ ...errors, stock_quantity: "" });
                   }}
                   placeholder="0"
                   className={`w-full px-4 py-3 rounded-xl border ${
@@ -367,7 +429,9 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                   } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
                 />
                 {errors.stock_quantity && (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.stock_quantity}</p>
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                    {errors.stock_quantity}
+                  </p>
                 )}
               </div>
               <div>
@@ -378,7 +442,15 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                   type="text"
                   inputMode="numeric"
                   value={formData.low_stock_threshold}
-                  onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value.replace(/[^0-9]/g, "") })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      low_stock_threshold: e.target.value.replace(
+                        /[^0-9]/g,
+                        "",
+                      ),
+                    })
+                  }
                   placeholder="10"
                   className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
                 />
@@ -395,7 +467,10 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                 inputMode="decimal"
                 value={formData.tax_rate}
                 onChange={(e) => {
-                  setFormData({ ...formData, tax_rate: e.target.value.replace(/[^0-9.]/g, "") });
+                  setFormData({
+                    ...formData,
+                    tax_rate: e.target.value.replace(/[^0-9.]/g, ""),
+                  });
                   if (errors.tax_rate) setErrors({ ...errors, tax_rate: "" });
                 }}
                 placeholder="0.00"
@@ -406,13 +481,17 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                 } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
               />
               {errors.tax_rate && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.tax_rate}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.tax_rate}
+                </p>
               )}
             </div>
 
             {errors.submit && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {errors.submit}
+                </p>
               </div>
             )}
 
@@ -502,8 +581,12 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
             ) : filteredProducts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Package className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">No products found</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Add your first product to get started</p>
+                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">
+                  No products found
+                </p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  Add your first product to get started
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -518,7 +601,8 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                           <h3 className="text-base font-bold text-[#111827] dark:text-white truncate">
                             {product.name}
                           </h3>
-                          {product.stock_quantity <= product.low_stock_threshold && (
+                          {product.stock_quantity <=
+                            product.low_stock_threshold && (
                             <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" />
                               Low Stock
@@ -526,33 +610,52 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                           )}
                         </div>
                         {product.category && (
-                          <p className="text-xs text-[#6B7280] dark:text-gray-400 mb-2">{product.category}</p>
+                          <p className="text-xs text-[#6B7280] dark:text-gray-400 mb-2">
+                            {product.category}
+                          </p>
                         )}
                         <div className="grid grid-cols-2 gap-3 mt-2">
                           <div>
-                            <p className="text-xs text-[#6B7280] dark:text-gray-400">Purchase</p>
-                            <p className="text-sm font-semibold text-[#111827] dark:text-white">{formatAmount(product.purchase_price)}</p>
+                            <p className="text-xs text-[#6B7280] dark:text-gray-400">
+                              Purchase
+                            </p>
+                            <p className="text-sm font-semibold text-[#111827] dark:text-white">
+                              {formatAmount(product.purchase_price)}
+                            </p>
                           </div>
                           <div>
-                            <p className="text-xs text-[#6B7280] dark:text-gray-400">Selling</p>
-                            <p className="text-sm font-semibold text-[#16A34A] dark:text-green-400">{formatAmount(product.selling_price)}</p>
+                            <p className="text-xs text-[#6B7280] dark:text-gray-400">
+                              Selling
+                            </p>
+                            <p className="text-sm font-semibold text-[#16A34A] dark:text-green-400">
+                              {formatAmount(product.selling_price)}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#E5E7EB] dark:border-gray-700">
                           <div>
-                            <p className="text-xs text-[#6B7280] dark:text-gray-400">Stock</p>
-                            <p className={`text-sm font-bold ${
-                              product.stock_quantity <= product.low_stock_threshold
-                                ? "text-orange-600 dark:text-orange-400"
-                                : "text-[#111827] dark:text-white"
-                            }`}>
+                            <p className="text-xs text-[#6B7280] dark:text-gray-400">
+                              Stock
+                            </p>
+                            <p
+                              className={`text-sm font-bold ${
+                                product.stock_quantity <=
+                                product.low_stock_threshold
+                                  ? "text-orange-600 dark:text-orange-400"
+                                  : "text-[#111827] dark:text-white"
+                              }`}
+                            >
                               {product.stock_quantity} units
                             </p>
                           </div>
                           {product.tax_rate > 0 && (
                             <div>
-                              <p className="text-xs text-[#6B7280] dark:text-gray-400">Tax</p>
-                              <p className="text-sm font-semibold text-[#111827] dark:text-white">{product.tax_rate}%</p>
+                              <p className="text-xs text-[#6B7280] dark:text-gray-400">
+                                Tax
+                              </p>
+                              <p className="text-sm font-semibold text-[#111827] dark:text-white">
+                                {product.tax_rate}%
+                              </p>
                             </div>
                           )}
                         </div>
@@ -582,18 +685,48 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
 
       {/* Confirm product save popup */}
       {showConfirmProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !isSubmitting && setShowConfirmProduct(false)}>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => !isSubmitting && setShowConfirmProduct(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-sm p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-lg font-bold text-[#111827] dark:text-white mb-3">
               {editingId ? "Confirm update" : "Confirm product"}
             </h3>
             <div className="text-sm text-[#6B7280] dark:text-gray-400 space-y-2 mb-4">
-              <p><span className="font-medium text-[#111827] dark:text-white">Name:</span> {formData.name.trim()}</p>
-              <p><span className="font-medium text-[#111827] dark:text-white">Category:</span> {getResolvedCategory() || "—"}</p>
-              <p><span className="font-medium text-[#111827] dark:text-white">Selling price:</span> ₹{formData.selling_price || "0"}</p>
-              <p><span className="font-medium text-[#111827] dark:text-white">Stock:</span> {formData.stock_quantity || "0"}</p>
+              <p>
+                <span className="font-medium text-[#111827] dark:text-white">
+                  Name:
+                </span>{" "}
+                {formData.name.trim()}
+              </p>
+              <p>
+                <span className="font-medium text-[#111827] dark:text-white">
+                  Category:
+                </span>{" "}
+                {getResolvedCategory() || "—"}
+              </p>
+              <p>
+                <span className="font-medium text-[#111827] dark:text-white">
+                  Selling price:
+                </span>{" "}
+                ₹{formData.selling_price || "0"}
+              </p>
+              <p>
+                <span className="font-medium text-[#111827] dark:text-white">
+                  Stock:
+                </span>{" "}
+                {formData.stock_quantity || "0"}
+              </p>
             </div>
-            {errors.submit && <p className="text-xs text-red-600 dark:text-red-400 mb-3">{errors.submit}</p>}
+            {errors.submit && (
+              <p className="text-xs text-red-600 dark:text-red-400 mb-3">
+                {errors.submit}
+              </p>
+            )}
             <div className="flex gap-3">
               <button
                 type="button"
@@ -608,7 +741,11 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
                 disabled={isSubmitting}
                 className="flex-1 py-2.5 rounded-xl font-medium bg-[#22C55E] dark:bg-green-600 text-white disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm"}
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Confirm"
+                )}
               </button>
             </div>
           </div>
@@ -617,5 +754,3 @@ export default function AddProduct({ onBack, initialShowLowStock, initialShowFor
     </div>
   );
 }
-
-

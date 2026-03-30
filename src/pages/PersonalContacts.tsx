@@ -1,6 +1,22 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, UserPlus, Search, Phone, MapPin, Users, CheckCircle2, X, Loader2, Edit2, Trash2, Wallet, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  ArrowLeft,
+  UserPlus,
+  Search,
+  Phone,
+  MapPin,
+  Users,
+  CheckCircle2,
+  X,
+  Loader2,
+  Edit2,
+  Trash2,
+  Wallet,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import api from "../utils/api";
+import axios from "axios";
 
 type PersonalContact = {
   id: number;
@@ -21,20 +37,30 @@ type PersonalContactsProps = {
   onViewLedger?: (contactId: number, contactName: string) => void;
 };
 
-export default function PersonalContacts({ onBack, onViewLedger }: PersonalContactsProps) {
+export default function PersonalContacts({
+  onBack,
+  onViewLedger,
+}: PersonalContactsProps) {
   const [showForm, setShowForm] = useState(false);
   const [contacts, setContacts] = useState<PersonalContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterRelationship, setFilterRelationship] = useState<"all" | "friend" | "family" | "colleague" | "neighbor" | "other">("all");
-  
+  const [filterRelationship, setFilterRelationship] = useState<
+    "all" | "friend" | "family" | "colleague" | "neighbor" | "other"
+  >("all");
+
   // Form state
   const [formData, setFormData] = useState({
     name: "",
     mobile: "",
     email: "",
     address: "",
-    relationship: "friend" as "friend" | "family" | "colleague" | "neighbor" | "other",
+    relationship: "friend" as
+      | "friend"
+      | "family"
+      | "colleague"
+      | "neighbor"
+      | "other",
     opening_balance: "",
     status: "active" as "active" | "inactive",
   });
@@ -49,12 +75,12 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
   const fetchContacts = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/personal-contacts');
+      const response = await api.get("/personal-contacts");
       if (response.data.success) {
         setContacts(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching contacts:', error);
+      console.error("Error fetching contacts:", error);
     } finally {
       setLoading(false);
     }
@@ -62,19 +88,30 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) {
       newErrors.name = "Name is required";
     }
-    if (formData.mobile && formData.mobile.length > 0 && formData.mobile.length !== 10) {
+    if (
+      formData.mobile &&
+      formData.mobile.length > 0 &&
+      formData.mobile.length !== 10
+    ) {
       newErrors.mobile = "Mobile number must be 10 digits";
     }
-    if (formData.email && formData.email.length > 0 && !formData.email.includes('@')) {
+    if (
+      formData.email &&
+      formData.email.length > 0 &&
+      !formData.email.includes("@")
+    ) {
       newErrors.email = "Invalid email address";
     }
-    if (formData.opening_balance && isNaN(parseFloat(formData.opening_balance))) {
+    if (
+      formData.opening_balance &&
+      isNaN(parseFloat(formData.opening_balance))
+    ) {
       newErrors.opening_balance = "Invalid amount";
     }
 
@@ -93,24 +130,29 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
         email: formData.email || null,
         address: formData.address || null,
         relationship: formData.relationship,
-        opening_balance: formData.opening_balance ? parseFloat(formData.opening_balance) : 0,
+        opening_balance: formData.opening_balance
+          ? parseFloat(formData.opening_balance)
+          : 0,
         status: formData.status,
       };
 
       if (editingId) {
         await api.put(`/personal-contacts/${editingId}`, payload);
       } else {
-        await api.post('/personal-contacts', payload);
+        await api.post("/personal-contacts", payload);
       }
 
       resetForm();
       fetchContacts();
-      
+
       // Trigger dashboard refresh
-      window.dispatchEvent(new CustomEvent('dashboard-refresh'));
-    } catch (error: any) {
+      window.dispatchEvent(new CustomEvent("dashboard-refresh"));
+    } catch (error: unknown) {
       setErrors({
-        submit: error.response?.data?.message || 'Failed to save contact. Please try again.'
+        submit: axios.isAxiosError(error)
+          ? (error.response?.data?.message ??
+            "Failed to save contact. Please try again.")
+          : "Failed to save contact. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -147,37 +189,45 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this contact?')) return;
-    
+    if (!confirm("Are you sure you want to delete this contact?")) return;
+
     try {
       await api.delete(`/personal-contacts/${id}`);
       fetchContacts();
-    } catch (error) {
-      alert('Failed to delete contact');
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete contact");
     }
   };
 
-  const filteredContacts = contacts.filter(contact => {
-    const matchesSearch = contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredContacts = contacts.filter((contact) => {
+    const matchesSearch =
+      contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (contact.mobile && contact.mobile.includes(searchQuery));
-    const matchesRelationship = filterRelationship === "all" || contact.relationship === filterRelationship;
+    const matchesRelationship =
+      filterRelationship === "all" ||
+      contact.relationship === filterRelationship;
     return matchesSearch && matchesRelationship;
   });
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
 
   const getRelationshipColor = (relationship: string) => {
     const colors: Record<string, string> = {
-      friend: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
-      family: "bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400",
-      colleague: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
-      neighbor: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
+      friend:
+        "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+      family:
+        "bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400",
+      colleague:
+        "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
+      neighbor:
+        "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
       other: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400",
     };
     return colors[relationship] || colors.other;
@@ -195,7 +245,11 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
           <ArrowLeft className="w-5 h-5 text-[#111827] dark:text-white" />
         </button>
         <h1 className="text-lg font-bold text-[#111827] dark:text-white flex-1">
-          {showForm ? (editingId ? "Edit Contact" : "Add Contact") : "Personal Contacts"}
+          {showForm
+            ? editingId
+              ? "Edit Contact"
+              : "Add Contact"
+            : "Personal Contacts"}
         </h1>
         {!showForm && (
           <button
@@ -239,7 +293,9 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                 } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.name}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.name}
+                </p>
               )}
             </div>
 
@@ -256,7 +312,10 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                   maxLength={10}
                   value={formData.mobile}
                   onChange={(e) => {
-                    setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, "") });
+                    setFormData({
+                      ...formData,
+                      mobile: e.target.value.replace(/\D/g, ""),
+                    });
                     if (errors.mobile) setErrors({ ...errors, mobile: "" });
                   }}
                   placeholder="Enter mobile number"
@@ -264,7 +323,9 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                 />
               </div>
               {errors.mobile && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.mobile}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.mobile}
+                </p>
               )}
             </div>
 
@@ -288,7 +349,9 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                 } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
               />
               {errors.email && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.email}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.email}
+                </p>
               )}
             </div>
 
@@ -301,7 +364,9 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                 <MapPin className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500 mt-1" />
                 <textarea
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, address: e.target.value })
+                  }
                   placeholder="Enter address"
                   rows={3}
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none"
@@ -315,11 +380,21 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                 Relationship <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-2 gap-3">
-                {(["friend", "family", "colleague", "neighbor", "other"] as const).map((rel) => (
+                {(
+                  [
+                    "friend",
+                    "family",
+                    "colleague",
+                    "neighbor",
+                    "other",
+                  ] as const
+                ).map((rel) => (
                   <button
                     key={rel}
                     type="button"
-                    onClick={() => setFormData({ ...formData, relationship: rel })}
+                    onClick={() =>
+                      setFormData({ ...formData, relationship: rel })
+                    }
                     className={`py-3 px-4 rounded-xl border-2 font-medium text-sm transition-all duration-200 ${
                       formData.relationship === rel
                         ? "border-[#22C55E] dark:border-green-500 bg-[#ECFDF3] dark:bg-green-900/30 text-[#16A34A] dark:text-green-400"
@@ -344,15 +419,21 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                   inputMode="decimal"
                   value={formData.opening_balance}
                   onChange={(e) => {
-                    setFormData({ ...formData, opening_balance: e.target.value.replace(/[^0-9.-]/g, "") });
-                    if (errors.opening_balance) setErrors({ ...errors, opening_balance: "" });
+                    setFormData({
+                      ...formData,
+                      opening_balance: e.target.value.replace(/[^0-9.-]/g, ""),
+                    });
+                    if (errors.opening_balance)
+                      setErrors({ ...errors, opening_balance: "" });
                   }}
                   placeholder="0.00 (Positive = they owe you, Negative = you owe them)"
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 text-sm"
                 />
               </div>
               {errors.opening_balance && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.opening_balance}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.opening_balance}
+                </p>
               )}
             </div>
 
@@ -381,7 +462,9 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
 
             {errors.submit && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {errors.submit}
+                </p>
               </div>
             )}
 
@@ -424,7 +507,16 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
               />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-              {(["all", "friend", "family", "colleague", "neighbor", "other"] as const).map((rel) => (
+              {(
+                [
+                  "all",
+                  "friend",
+                  "family",
+                  "colleague",
+                  "neighbor",
+                  "other",
+                ] as const
+              ).map((rel) => (
                 <button
                   key={rel}
                   onClick={() => setFilterRelationship(rel)}
@@ -449,8 +541,12 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
             ) : filteredContacts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Users className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">No contacts found</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Add your first contact to track money</p>
+                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">
+                  No contacts found
+                </p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  Add your first contact to track money
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -458,7 +554,7 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                   const balance = contact.balance || 0;
                   const youOwe = contact.you_owe || 0;
                   const theyOwe = contact.they_owe || 0;
-                  
+
                   return (
                     <div
                       key={contact.id}
@@ -471,7 +567,9 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                             <h3 className="text-base font-bold text-[#111827] dark:text-white truncate">
                               {contact.name}
                             </h3>
-                            <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${getRelationshipColor(contact.relationship)}`}>
+                            <span
+                              className={`px-2 py-0.5 rounded-lg text-xs font-medium ${getRelationshipColor(contact.relationship)}`}
+                            >
                               {contact.relationship}
                             </span>
                             {contact.status === "inactive" && (
@@ -488,8 +586,11 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                           )}
                           {contact.address && (
                             <div className="flex items-start gap-2 text-sm text-[#6B7280] dark:text-gray-400 mb-2">
-                              <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                              <span className="line-clamp-2">{contact.address}</span>
+                              <MapPin className="w-4 h-4 mt-0.5 flex shrink-0" />
+
+                              <span className="line-clamp-2">
+                                {contact.address}
+                              </span>
                             </div>
                           )}
                           {/* Balance Display */}
@@ -497,7 +598,9 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                             {balance > 0 ? (
                               <div className="flex items-center gap-2 text-sm">
                                 <ArrowDown className="w-4 h-4 text-[#16A34A] dark:text-green-400" />
-                                <span className="text-[#6B7280] dark:text-gray-400">They owe you: </span>
+                                <span className="text-[#6B7280] dark:text-gray-400">
+                                  They owe you:{" "}
+                                </span>
                                 <span className="font-bold text-[#16A34A] dark:text-green-400">
                                   {formatAmount(theyOwe)}
                                 </span>
@@ -505,7 +608,9 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                             ) : balance < 0 ? (
                               <div className="flex items-center gap-2 text-sm">
                                 <ArrowUp className="w-4 h-4 text-[#DC2626] dark:text-red-400" />
-                                <span className="text-[#6B7280] dark:text-gray-400">You owe: </span>
+                                <span className="text-[#6B7280] dark:text-gray-400">
+                                  You owe:{" "}
+                                </span>
                                 <span className="font-bold text-[#DC2626] dark:text-red-400">
                                   {formatAmount(youOwe)}
                                 </span>
@@ -518,7 +623,10 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 ml-3" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center gap-2 ml-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             onClick={() => handleEdit(contact)}
                             className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all duration-200"
@@ -544,4 +652,3 @@ export default function PersonalContacts({ onBack, onViewLedger }: PersonalConta
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Phone,
   Clock,
@@ -14,6 +14,95 @@ const LOGO_SRC = "/logo.png";
 export default function Login() {
   const [mobile, setMobile] = useState("");
   const [error, setError] = useState("");
+
+  // Add styles to head
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes login-card-in {
+        0% {
+          opacity: 0;
+          transform: translateY(24px) scale(0.96);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      @keyframes login-logo-in {
+        0% {
+          opacity: 0;
+          transform: scale(0.5);
+        }
+        70% {
+          transform: scale(1.08);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      @keyframes login-logo-float {
+        0%, 100% {
+          transform: translateY(0) scale(1);
+        }
+        50% {
+          transform: translateY(-8px) scale(1.02);
+        }
+      }
+      @keyframes login-logo-glow {
+        0%, 100% {
+          box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.2);
+        }
+        50% {
+          box-shadow: 0 0 24px 4px rgba(34, 197, 94, 0.15);
+        }
+      }
+      @keyframes login-stagger {
+        0% {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes login-feature-in {
+        0% {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .login-card {
+        animation: login-card-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      .login-logo {
+        animation: login-logo-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      .login-logo-float {
+        animation: login-logo-float 3s ease-in-out 0.7s infinite;
+      }
+      .login-logo-wrap {
+        animation: login-logo-glow 2.5s ease-in-out infinite;
+      }
+      .login-stagger-1 { opacity: 0; animation: login-stagger 0.4s ease-out 0.2s forwards; }
+      .login-stagger-2 { opacity: 0; animation: login-stagger 0.4s ease-out 0.3s forwards; }
+      .login-stagger-3 { opacity: 0; animation: login-stagger 0.4s ease-out 0.4s forwards; }
+      .login-stagger-4 { opacity: 0; animation: login-stagger 0.4s ease-out 0.5s forwards; }
+      .login-feature-1 { opacity: 0; animation: login-feature-in 0.35s ease-out 0.7s forwards; }
+      .login-feature-2 { opacity: 0; animation: login-feature-in 0.35s ease-out 0.85s forwards; }
+      .login-feature-3 { opacity: 0; animation: login-feature-in 0.35s ease-out 1s forwards; }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   // ✅ clean validation
   const isValidMobile = useMemo(() => {
@@ -32,86 +121,6 @@ export default function Login() {
 
   return (
     <>
-      <style>{`
-        @keyframes login-card-in {
-          0% {
-            opacity: 0;
-            transform: translateY(24px) scale(0.96);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-          }
-        }
-        @keyframes login-logo-in {
-          0% {
-            opacity: 0;
-            transform: scale(0.5);
-          }
-          70% {
-            transform: scale(1.08);
-          }
-          100% {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        @keyframes login-logo-float {
-          0%, 100% {
-            transform: translateY(0) scale(1);
-          }
-          50% {
-            transform: translateY(-8px) scale(1.02);
-          }
-        }
-        @keyframes login-logo-glow {
-          0%, 100% {
-            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.2);
-          }
-          50% {
-            box-shadow: 0 0 24px 4px rgba(34, 197, 94, 0.15);
-          }
-        }
-        @keyframes login-stagger {
-          0% {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        @keyframes login-feature-in {
-          0% {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .login-card {
-          animation: login-card-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        .login-logo {
-          animation: login-logo-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        .login-logo-float {
-          animation: login-logo-float 3s ease-in-out 0.7s infinite;
-        }
-        .login-logo-wrap {
-          animation: login-logo-glow 2.5s ease-in-out infinite;
-        }
-        .login-stagger-1 { opacity: 0; animation: login-stagger 0.4s ease-out 0.2s forwards; }
-        .login-stagger-2 { opacity: 0; animation: login-stagger 0.4s ease-out 0.3s forwards; }
-        .login-stagger-3 { opacity: 0; animation: login-stagger 0.4s ease-out 0.4s forwards; }
-        .login-stagger-4 { opacity: 0; animation: login-stagger 0.4s ease-out 0.5s forwards; }
-        .login-feature-1 { opacity: 0; animation: login-feature-in 0.35s ease-out 0.7s forwards; }
-        .login-feature-2 { opacity: 0; animation: login-feature-in 0.35s ease-out 0.85s forwards; }
-        .login-feature-3 { opacity: 0; animation: login-feature-in 0.35s ease-out 1s forwards; }
-      `}</style>
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 px-4 relative overflow-hidden">
         {/* Background glow */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(34,197,94,0.08),transparent)] dark:bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(34,197,94,0.06),transparent)] pointer-events-none" />

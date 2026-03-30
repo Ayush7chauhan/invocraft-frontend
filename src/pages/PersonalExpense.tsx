@@ -1,7 +1,21 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, TrendingDown, Calendar, DollarSign, Search, Loader2, CheckCircle2, X, Edit2, Trash2, Plus, Tag } from "lucide-react";
+import {
+  ArrowLeft,
+  TrendingDown,
+  Calendar,
+  DollarSign,
+  Search,
+  Loader2,
+  CheckCircle2,
+  X,
+  Edit2,
+  Trash2,
+  Plus,
+  Tag,
+} from "lucide-react";
 import api from "../utils/api";
 import { Autocomplete } from "../components/ui/autocomplete";
+import axios from "axios";
 
 type PersonalExpense = {
   id: number;
@@ -25,16 +39,21 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
-  
+
   // Form state
   const [formData, setFormData] = useState({
     title: "",
     category: "",
     amount: "",
     gst_rate: "",
-    expense_date: new Date().toISOString().split('T')[0],
+    expense_date: new Date().toISOString().split("T")[0],
     description: "",
-    payment_method: "cash" as "cash" | "upi" | "card" | "bank_transfer" | "other",
+    payment_method: "cash" as
+      | "cash"
+      | "upi"
+      | "card"
+      | "bank_transfer"
+      | "other",
     reference_number: "",
     notes: "",
   });
@@ -78,12 +97,12 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
   const fetchExpenses = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/personal-expenses');
+      const response = await api.get("/personal-expenses");
       if (response.data.success) {
         setExpenses(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching expenses:', error);
+      console.error("Error fetching expenses:", error);
     } finally {
       setLoading(false);
     }
@@ -91,7 +110,7 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newErrors: Record<string, string> = {};
     if (!formData.title.trim()) {
       newErrors.title = "Title is required";
@@ -117,9 +136,8 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
     try {
       const baseAmount = parseFloat(formData.amount);
       const gstRate = formData.gst_rate ? parseFloat(formData.gst_rate) : 0;
-      const totalAmount = gstRate > 0
-        ? baseAmount + (baseAmount * gstRate) / 100
-        : baseAmount;
+      const totalAmount =
+        gstRate > 0 ? baseAmount + (baseAmount * gstRate) / 100 : baseAmount;
 
       const payload = {
         title: formData.title.trim(),
@@ -135,19 +153,25 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
       if (editingId) {
         await api.put(`/personal-expenses/${editingId}`, payload);
       } else {
-        await api.post('/personal-expenses', payload);
+        await api.post("/personal-expenses", payload);
       }
 
       resetForm();
       fetchExpenses();
-      window.dispatchEvent(new CustomEvent('dashboard-refresh'));
-    } catch (error: any) {
-      const res = error.response?.data;
-      let message = res?.message || 'Failed to save expense. Please try again.';
-      if (res?.errors && typeof res.errors === 'object') {
-        const first = Object.values(res.errors).flat();
-        if (first.length) message = String(first[0]);
+      window.dispatchEvent(new CustomEvent("dashboard-refresh"));
+    } catch (error: unknown) {
+      let message = "Failed to save expense. Please try again.";
+
+      if (axios.isAxiosError(error)) {
+        const res = error.response?.data;
+        message = res?.message ?? message;
+
+        if (res?.errors) {
+          const first = Object.values(res.errors).flat();
+          if (first.length) message = String(first[0]);
+        }
       }
+
       setErrors({ submit: message });
     } finally {
       setIsSubmitting(false);
@@ -160,7 +184,7 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
       category: "",
       amount: "",
       gst_rate: "",
-      expense_date: new Date().toISOString().split('T')[0],
+      expense_date: new Date().toISOString().split("T")[0],
       description: "",
       payment_method: "cash",
       reference_number: "",
@@ -170,47 +194,54 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
     setShowForm(false);
     setEditingId(null);
   };
-
-  const handleEdit = (expense: any) => {
+  const handleEdit = (expense: Expense) => {
     setFormData({
-      title: expense.title || "",
+      title: expense.title ?? "",
       category: expense.category,
-      amount: expense.amount.toString(),
-      gst_rate: expense.gst_rate ? expense.gst_rate.toString() : "",
+      amount: String(expense.amount),
+      gst_rate: expense.gst_rate ? String(expense.gst_rate) : "",
       expense_date: expense.expense_date,
-      description: expense.description || "",
-      payment_method: expense.payment_method as any,
-      reference_number: expense.reference_number || "",
-      notes: expense.notes || "",
+      description: expense.description ?? "",
+      payment_method: expense.payment_method,
+      reference_number: expense.reference_number ?? "",
+      notes: expense.notes ?? "",
     });
+
     setEditingId(expense.id);
     setShowForm(true);
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this expense?')) return;
-    
+    if (!confirm("Are you sure you want to delete this expense?")) return;
+
     try {
       await api.delete(`/personal-expenses/${id}`);
       fetchExpenses();
-      window.dispatchEvent(new CustomEvent('dashboard-refresh'));
-    } catch (error) {
-      alert('Failed to delete expense');
+      window.dispatchEvent(new CustomEvent("dashboard-refresh"));
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete expense");
     }
   };
 
-  const filteredExpenses = expenses.filter(expense => {
-    const matchesSearch = expense.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (expense.description && expense.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (expense.title && expense.title.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory = filterCategory === "all" || expense.category === filterCategory;
+  const filteredExpenses = expenses.filter((expense) => {
+    const matchesSearch =
+      expense.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (expense.description &&
+        expense.description
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())) ||
+      (expense.title &&
+        expense.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesCategory =
+      filterCategory === "all" || expense.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
@@ -222,11 +253,15 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
     yesterday.setDate(yesterday.getDate() - 1);
 
     if (date.toDateString() === today.toDateString()) {
-      return 'Today';
+      return "Today";
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
+      return "Yesterday";
     } else {
-      return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      return date.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
     }
   };
 
@@ -242,7 +277,11 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
           <ArrowLeft className="w-5 h-5 text-[#111827] dark:text-white" />
         </button>
         <h1 className="text-lg font-bold text-[#111827] dark:text-white flex-1">
-          {showForm ? (editingId ? "Edit Expense" : "Add Expense/Purchase") : "Personal Expenses & Purchases"}
+          {showForm
+            ? editingId
+              ? "Edit Expense"
+              : "Add Expense/Purchase"
+            : "Personal Expenses & Purchases"}
         </h1>
         {!showForm && (
           <button
@@ -286,7 +325,9 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
                 } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
               />
               {errors.title && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.title}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.title}
+                </p>
               )}
             </div>
 
@@ -303,10 +344,14 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
                 }}
                 options={categories}
                 placeholder="Select category"
-                className={errors.category ? "border-red-300 dark:border-red-700" : ""}
+                className={
+                  errors.category ? "border-red-300 dark:border-red-700" : ""
+                }
               />
               {errors.category && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.category}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.category}
+                </p>
               )}
             </div>
 
@@ -322,7 +367,10 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
                   inputMode="decimal"
                   value={formData.amount}
                   onChange={(e) => {
-                    setFormData({ ...formData, amount: e.target.value.replace(/[^0-9.]/g, "") });
+                    setFormData({
+                      ...formData,
+                      amount: e.target.value.replace(/[^0-9.]/g, ""),
+                    });
                     if (errors.amount) setErrors({ ...errors, amount: "" });
                   }}
                   placeholder="Enter amount"
@@ -332,7 +380,9 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
                 />
               </div>
               {errors.amount && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.amount}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.amount}
+                </p>
               )}
             </div>
 
@@ -346,33 +396,55 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
                 inputMode="decimal"
                 value={formData.gst_rate}
                 onChange={(e) => {
-                  setFormData({ ...formData, gst_rate: e.target.value.replace(/[^0-9.]/g, "") });
+                  setFormData({
+                    ...formData,
+                    gst_rate: e.target.value.replace(/[^0-9.]/g, ""),
+                  });
                 }}
                 placeholder="Enter GST rate (e.g., 18)"
                 className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
               />
-              {formData.amount && formData.gst_rate && parseFloat(formData.gst_rate) > 0 && (
-                <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Base Amount:</span>
-                    <span className="font-semibold text-[#111827] dark:text-white">
-                      ₹{parseFloat(formData.amount).toFixed(2)}
-                    </span>
+              {formData.amount &&
+                formData.gst_rate &&
+                parseFloat(formData.gst_rate) > 0 && (
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Base Amount:
+                      </span>
+                      <span className="font-semibold text-[#111827] dark:text-white">
+                        ₹{parseFloat(formData.amount).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        GST ({formData.gst_rate}%):
+                      </span>
+                      <span className="font-semibold text-[#111827] dark:text-white">
+                        ₹
+                        {(
+                          (parseFloat(formData.amount) *
+                            parseFloat(formData.gst_rate || "0")) /
+                          100
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+                      <span className="font-semibold text-[#111827] dark:text-white">
+                        Total Amount:
+                      </span>
+                      <span className="font-bold text-lg text-blue-600 dark:text-blue-400">
+                        ₹
+                        {(
+                          parseFloat(formData.amount) +
+                          (parseFloat(formData.amount) *
+                            parseFloat(formData.gst_rate || "0")) /
+                            100
+                        ).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-gray-600 dark:text-gray-400">GST ({formData.gst_rate}%):</span>
-                    <span className="font-semibold text-[#111827] dark:text-white">
-                      ₹{((parseFloat(formData.amount) * parseFloat(formData.gst_rate || "0")) / 100).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
-                    <span className="font-semibold text-[#111827] dark:text-white">Total Amount:</span>
-                    <span className="font-bold text-lg text-blue-600 dark:text-blue-400">
-                      ₹{(parseFloat(formData.amount) + (parseFloat(formData.amount) * parseFloat(formData.gst_rate || "0")) / 100).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-              )}
+                )}
             </div>
 
             {/* Date */}
@@ -387,13 +459,16 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
                   value={formData.expense_date}
                   onChange={(e) => {
                     setFormData({ ...formData, expense_date: e.target.value });
-                    if (errors.expense_date) setErrors({ ...errors, expense_date: "" });
+                    if (errors.expense_date)
+                      setErrors({ ...errors, expense_date: "" });
                   }}
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white"
                 />
               </div>
               {errors.expense_date && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.expense_date}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.expense_date}
+                </p>
               )}
             </div>
 
@@ -404,7 +479,12 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
               </label>
               <Autocomplete
                 value={formData.payment_method}
-                onValueChange={(value) => setFormData({ ...formData, payment_method: value as typeof formData.payment_method })}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    payment_method: value as typeof formData.payment_method,
+                  })
+                }
                 options={paymentMethods}
                 placeholder="Select payment method"
               />
@@ -417,7 +497,9 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
               </label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 placeholder="Add a description"
                 rows={3}
                 className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500 resize-none"
@@ -432,7 +514,9 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
               <input
                 type="text"
                 value={formData.reference_number}
-                onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, reference_number: e.target.value })
+                }
                 placeholder="Transaction reference (optional)"
                 className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
               />
@@ -445,7 +529,9 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
               </label>
               <textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
                 placeholder="Additional notes (optional)"
                 rows={2}
                 className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500 resize-none"
@@ -454,7 +540,9 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
 
             {errors.submit && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {errors.submit}
+                </p>
               </div>
             )}
 
@@ -532,8 +620,12 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
             ) : filteredExpenses.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <TrendingDown className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">No expenses or purchases found</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Add your first expense or purchase</p>
+                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">
+                  No expenses or purchases found
+                </p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  Add your first expense or purchase
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -550,7 +642,8 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
                             {expense.title || expense.category}
                           </h3>
                           <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-[#6B7280] dark:text-gray-400">
-                            {expense.category.charAt(0).toUpperCase() + expense.category.slice(1)}
+                            {expense.category.charAt(0).toUpperCase() +
+                              expense.category.slice(1)}
                           </span>
                         </div>
                         <p className="text-lg font-bold text-red-600 dark:text-red-400 mb-1">
@@ -562,13 +655,19 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
                             <span>{formatDate(expense.expense_date)}</span>
                           </div>
                           <span>•</span>
-                          <span className="capitalize">{expense.payment_method.replace('_', ' ')}</span>
+                          <span className="capitalize">
+                            {expense.payment_method.replace("_", " ")}
+                          </span>
                         </div>
                         {expense.description && (
-                          <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-2">{expense.description}</p>
+                          <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-2">
+                            {expense.description}
+                          </p>
                         )}
                         {expense.notes && (
-                          <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mt-1 italic">{expense.notes}</p>
+                          <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mt-1 italic">
+                            {expense.notes}
+                          </p>
                         )}
                       </div>
                       <div className="flex items-center gap-2 ml-3">
@@ -596,4 +695,3 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
     </div>
   );
 }
-

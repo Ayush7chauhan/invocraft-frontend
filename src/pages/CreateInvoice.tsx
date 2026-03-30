@@ -1,9 +1,23 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Plus, X, FileText, Download, Eye, Trash2, Calendar, User, Loader2, CheckCircle2, Wallet, CircleDollarSign } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  X,
+  FileText,
+  Download,
+  Eye,
+  Trash2,
+  Calendar,
+  Loader2,
+  CheckCircle2,
+  Wallet,
+  CircleDollarSign,
+} from "lucide-react";
 import api from "../utils/api";
 import { Autocomplete } from "../components/ui/autocomplete";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import axios from "axios";
 
 type Party = {
   id: number;
@@ -48,10 +62,15 @@ const emptyModalItem = {
   tax_rate: 0,
 };
 
-export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: CreateInvoiceProps) {
+export default function CreateInvoice({
+  onBack,
+  onGoToBills,
+  onGoToDashboard,
+}: CreateInvoiceProps) {
   const [parties, setParties] = useState<Party[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  // const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -59,17 +78,17 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [modalItem, setModalItem] = useState(emptyModalItem);
-  
+
   const [formData, setFormData] = useState({
     party_id: "",
-    invoice_date: new Date().toISOString().split('T')[0],
+    invoice_date: new Date().toISOString().split("T")[0],
     invoice_number: "",
     notes: "",
     terms: "",
     payment_status: "unpaid" as "unpaid" | "paid" | "partially_paid",
     paid_amount: "",
   });
-  
+
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const previewRef = useRef<HTMLDivElement>(null);
@@ -83,23 +102,25 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
 
   const fetchParties = async () => {
     try {
-      const response = await api.get('/parties', { params: { type: 'customer' } });
+      const response = await api.get("/parties", {
+        params: { type: "customer" },
+      });
       if (response.data.success) {
         setParties(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching parties:', error);
+      console.error("Error fetching parties:", error);
     }
   };
 
   const fetchProducts = async () => {
     try {
-      const response = await api.get('/products');
+      const response = await api.get("/products");
       if (response.data.success) {
         setProducts(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error("Error fetching products:", error);
     } finally {
       setLoading(false);
     }
@@ -108,12 +129,14 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
   const generateInvoiceNumber = () => {
     const date = new Date();
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    setFormData(prev => ({
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0");
+    setFormData((prev) => ({
       ...prev,
-      invoice_number: `INV-${year}${month}${day}-${random}`
+      invoice_number: `INV-${year}${month}${day}-${random}`,
     }));
   };
 
@@ -169,33 +192,41 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
   };
 
   const removeItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
+    setItems(items.filter((item) => item.id !== id));
   };
 
-  const updateItem = (id: string, field: keyof InvoiceItem, value: any) => {
-    setItems(items.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, [field]: value };
-        
+  const updateItem = <K extends keyof InvoiceItem>(
+    id: string,
+    field: K,
+    value: InvoiceItem[K],
+  ) => {
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id !== id) return item;
+
+        const updated: InvoiceItem = {
+          ...item,
+          [field]: value,
+        };
+
         // If product changed, update product details
-        if (field === 'product_id') {
-          const product = products.find(p => p.id === Number(value));
+        if (field === "product_id") {
+          const product = products.find((p) => p.id === Number(value));
           if (product) {
             updated.product_name = product.name;
             updated.unit_price = product.selling_price;
-            updated.tax_rate = product.tax_rate || 0;
+            updated.tax_rate = product.tax_rate ?? 0;
           }
         }
-        
+
         // Recalculate totals
         updated.subtotal = updated.quantity * updated.unit_price;
         updated.tax_amount = (updated.subtotal * updated.tax_rate) / 100;
         updated.total = updated.subtotal + updated.tax_amount;
-        
+
         return updated;
-      }
-      return item;
-    }));
+      }),
+    );
   };
 
   const calculateTotals = () => {
@@ -207,7 +238,7 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newErrors: Record<string, string> = {};
     if (!formData.party_id) {
       newErrors.party_id = "Please select a customer";
@@ -218,7 +249,7 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
     if (items.length === 0) {
       newErrors.items = "Please add at least one item";
     }
-    if (items.some(item => !item.product_id || item.quantity <= 0)) {
+    if (items.some((item) => !item.product_id || item.quantity <= 0)) {
       newErrors.items = "Please fill all item details correctly";
     }
     const totalAmount = calculateTotals().total;
@@ -256,7 +287,7 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
         terms: formData.terms || null,
         payment_status: formData.payment_status,
         paid_amount: paidAmount,
-        items: items.map(item => ({
+        items: items.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -264,14 +295,16 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
         })),
       };
 
-      const response = await api.post('/invoices', payload);
+      const response = await api.post("/invoices", payload);
       if (response.data.success) {
-        window.dispatchEvent(new CustomEvent('dashboard-refresh'));
+        window.dispatchEvent(new CustomEvent("dashboard-refresh"));
         setShowSuccess(true);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setErrors({
-        submit: error.response?.data?.message || 'Failed to create invoice. Please try again.'
+        submit: axios.isAxiosError(error)
+          ? (error.response?.data?.message ?? "Failed to create invoice.")
+          : "Failed to create invoice.",
       });
     } finally {
       setIsSubmitting(false);
@@ -318,16 +351,18 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
   }, [isGeneratingPDF, formData.invoice_number]);
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
       maximumFractionDigits: 2,
     }).format(amount);
   };
 
-  const selectedParty = parties.find(p => p.id === parseInt(formData.party_id));
+  const selectedParty = parties.find(
+    (p) => p.id === parseInt(formData.party_id),
+  );
   const totals = calculateTotals();
-  const userData = JSON.parse(localStorage.getItem('user') || '{}');
+  const userData = JSON.parse(localStorage.getItem("user") || "{}");
 
   if (showSuccess) {
     return (
@@ -336,8 +371,12 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
           <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-6">
             <CheckCircle2 className="w-12 h-12 text-green-600 dark:text-green-400" />
           </div>
-          <h2 className="text-xl font-bold text-[#111827] dark:text-white mb-2">Invoice created successfully!</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">What would you like to do next?</p>
+          <h2 className="text-xl font-bold text-[#111827] dark:text-white mb-2">
+            Invoice created successfully!
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
+            What would you like to do next?
+          </p>
           <div className="flex flex-col gap-3 w-full">
             <button
               type="button"
@@ -378,67 +417,217 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
               fontSize: 14,
             }}
           >
-            <div style={{ borderBottom: "2px solid #d1d5db", paddingBottom: 16, marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div
+              style={{
+                borderBottom: "2px solid #d1d5db",
+                paddingBottom: 16,
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                }}
+              >
                 <div>
-                  <h1 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px 0" }}>{userData.shop_name || "My Shop"}</h1>
-                  <p style={{ fontSize: 14, color: "#4b5563", margin: 0 }}>{userData.shop_address || "Address not set"}</p>
-                  {userData.mobile_number && <p style={{ fontSize: 14, color: "#4b5563", margin: "4px 0 0 0" }}>Phone: {userData.mobile_number}</p>}
+                  <h1
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 700,
+                      margin: "0 0 4px 0",
+                    }}
+                  >
+                    {userData.shop_name || "My Shop"}
+                  </h1>
+                  <p style={{ fontSize: 14, color: "#4b5563", margin: 0 }}>
+                    {userData.shop_address || "Address not set"}
+                  </p>
+                  {userData.mobile_number && (
+                    <p
+                      style={{
+                        fontSize: 14,
+                        color: "#4b5563",
+                        margin: "4px 0 0 0",
+                      }}
+                    >
+                      Phone: {userData.mobile_number}
+                    </p>
+                  )}
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px 0" }}>INVOICE</h2>
-                  <p style={{ fontSize: 14, margin: 0 }}>Invoice #: {formData.invoice_number}</p>
-                  <p style={{ fontSize: 14, margin: "4px 0 0 0" }}>Date: {new Date(formData.invoice_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                  <h2
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 700,
+                      margin: "0 0 4px 0",
+                    }}
+                  >
+                    INVOICE
+                  </h2>
+                  <p style={{ fontSize: 14, margin: 0 }}>
+                    Invoice #: {formData.invoice_number}
+                  </p>
+                  <p style={{ fontSize: 14, margin: "4px 0 0 0" }}>
+                    Date:{" "}
+                    {new Date(formData.invoice_date).toLocaleDateString(
+                      "en-IN",
+                      { day: "numeric", month: "short", year: "numeric" },
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0" }}>Bill To:</h3>
-              <p style={{ fontSize: 14, margin: 0 }}>{selectedParty?.name || "Customer Name"}</p>
-              {selectedParty?.address && <p style={{ fontSize: 14, color: "#4b5563", margin: "4px 0 0 0" }}>{selectedParty.address}</p>}
-              {selectedParty?.mobile && <p style={{ fontSize: 14, color: "#4b5563", margin: "4px 0 0 0" }}>Phone: {selectedParty.mobile}</p>}
+              <h3
+                style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px 0" }}
+              >
+                Bill To:
+              </h3>
+              <p style={{ fontSize: 14, margin: 0 }}>
+                {selectedParty?.name || "Customer Name"}
+              </p>
+              {selectedParty?.address && (
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: "#4b5563",
+                    margin: "4px 0 0 0",
+                  }}
+                >
+                  {selectedParty.address}
+                </p>
+              )}
+              {selectedParty?.mobile && (
+                <p
+                  style={{
+                    fontSize: 14,
+                    color: "#4b5563",
+                    margin: "4px 0 0 0",
+                  }}
+                >
+                  Phone: {selectedParty.mobile}
+                </p>
+              )}
             </div>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, marginBottom: 16 }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 14,
+                marginBottom: 16,
+              }}
+            >
               <thead>
                 <tr style={{ borderBottom: "2px solid #d1d5db" }}>
-                  <th style={{ textAlign: "left", padding: "8px 4px" }}>Item</th>
-                  <th style={{ textAlign: "right", padding: "8px 4px" }}>Qty</th>
-                  <th style={{ textAlign: "right", padding: "8px 4px" }}>Price</th>
-                  <th style={{ textAlign: "right", padding: "8px 4px" }}>Tax</th>
-                  <th style={{ textAlign: "right", padding: "8px 4px" }}>Total</th>
+                  <th style={{ textAlign: "left", padding: "8px 4px" }}>
+                    Item
+                  </th>
+                  <th style={{ textAlign: "right", padding: "8px 4px" }}>
+                    Qty
+                  </th>
+                  <th style={{ textAlign: "right", padding: "8px 4px" }}>
+                    Price
+                  </th>
+                  <th style={{ textAlign: "right", padding: "8px 4px" }}>
+                    Tax
+                  </th>
+                  <th style={{ textAlign: "right", padding: "8px 4px" }}>
+                    Total
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-                    <td style={{ padding: "8px 4px" }}>{item.product_name}{item.tax_rate > 0 ? ` (Tax: ${item.tax_rate}%)` : ""}</td>
-                    <td style={{ textAlign: "right", padding: "8px 4px" }}>{item.quantity}</td>
-                    <td style={{ textAlign: "right", padding: "8px 4px" }}>{formatAmount(item.unit_price)}</td>
-                    <td style={{ textAlign: "right", padding: "8px 4px" }}>{formatAmount(item.tax_amount)}</td>
-                    <td style={{ textAlign: "right", padding: "8px 4px", fontWeight: 600 }}>{formatAmount(item.total)}</td>
+                  <tr
+                    key={item.id}
+                    style={{ borderBottom: "1px solid #e5e7eb" }}
+                  >
+                    <td style={{ padding: "8px 4px" }}>
+                      {item.product_name}
+                      {item.tax_rate > 0 ? ` (Tax: ${item.tax_rate}%)` : ""}
+                    </td>
+                    <td style={{ textAlign: "right", padding: "8px 4px" }}>
+                      {item.quantity}
+                    </td>
+                    <td style={{ textAlign: "right", padding: "8px 4px" }}>
+                      {formatAmount(item.unit_price)}
+                    </td>
+                    <td style={{ textAlign: "right", padding: "8px 4px" }}>
+                      {formatAmount(item.tax_amount)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "right",
+                        padding: "8px 4px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {formatAmount(item.total)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <div style={{ width: 200, fontSize: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #e5e7eb" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "4px 0",
+                    borderBottom: "1px solid #e5e7eb",
+                  }}
+                >
                   <span style={{ color: "#4b5563" }}>Subtotal</span>
-                  <span style={{ fontWeight: 600 }}>{formatAmount(totals.subtotal)}</span>
+                  <span style={{ fontWeight: 600 }}>
+                    {formatAmount(totals.subtotal)}
+                  </span>
                 </div>
                 {totals.totalTax > 0 && (
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: "1px solid #e5e7eb" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "4px 0",
+                      borderBottom: "1px solid #e5e7eb",
+                    }}
+                  >
                     <span style={{ color: "#4b5563" }}>Tax</span>
-                    <span style={{ fontWeight: 600 }}>{formatAmount(totals.totalTax)}</span>
+                    <span style={{ fontWeight: 600 }}>
+                      {formatAmount(totals.totalTax)}
+                    </span>
                   </div>
                 )}
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontWeight: 700, fontSize: 16 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "8px 0",
+                    fontWeight: 700,
+                    fontSize: 16,
+                  }}
+                >
                   <span>Total</span>
-                  <span style={{ color: "#16a34a" }}>{formatAmount(totals.total)}</span>
+                  <span style={{ color: "#16a34a" }}>
+                    {formatAmount(totals.total)}
+                  </span>
                 </div>
               </div>
             </div>
-            <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #e5e7eb", textAlign: "center", fontSize: 12, color: "#6b7280" }}>Thank you for your business!</div>
+            <div
+              style={{
+                marginTop: 24,
+                paddingTop: 16,
+                borderTop: "1px solid #e5e7eb",
+                textAlign: "center",
+                fontSize: 12,
+                color: "#6b7280",
+              }}
+            >
+              Thank you for your business!
+            </div>
           </div>
         )}
 
@@ -469,7 +658,10 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
 
         {/* Invoice Preview */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 hide-scrollbar bg-gray-50 dark:bg-gray-800">
-          <div ref={previewRef} className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 sm:p-8 max-w-4xl mx-auto min-w-0">
+          <div
+            ref={previewRef}
+            className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-6 sm:p-8 max-w-4xl mx-auto min-w-0"
+          >
             {/* Invoice Header */}
             <div className="border-b-2 border-[#E5E7EB] dark:border-gray-700 pb-5 mb-5">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
@@ -487,12 +679,21 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                   )}
                 </div>
                 <div className="text-left sm:text-right shrink-0">
-                  <h2 className="text-xl sm:text-2xl font-bold text-[#111827] dark:text-white mb-1">INVOICE</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-[#111827] dark:text-white mb-1">
+                    INVOICE
+                  </h2>
                   <p className="text-sm text-[#6B7280] dark:text-gray-400">
-                    Invoice #: <span className="font-semibold text-[#111827] dark:text-white">{formData.invoice_number}</span>
+                    Invoice #:{" "}
+                    <span className="font-semibold text-[#111827] dark:text-white">
+                      {formData.invoice_number}
+                    </span>
                   </p>
                   <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-0.5">
-                    Date: {new Date(formData.invoice_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    Date:{" "}
+                    {new Date(formData.invoice_date).toLocaleDateString(
+                      "en-IN",
+                      { day: "numeric", month: "short", year: "numeric" },
+                    )}
                   </p>
                 </div>
               </div>
@@ -500,7 +701,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
 
             {/* Bill To */}
             <div className="mb-5">
-              <h3 className="text-sm font-semibold text-[#111827] dark:text-white mb-1.5">Bill To:</h3>
+              <h3 className="text-sm font-semibold text-[#111827] dark:text-white mb-1.5">
+                Bill To:
+              </h3>
               <p className="text-sm font-medium text-[#111827] dark:text-white">
                 {selectedParty?.name || "Customer Name"}
               </p>
@@ -518,7 +721,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
 
             {/* Items - mobile: cards; desktop: table */}
             <div className="mb-5">
-              <p className="text-xs font-semibold text-[#6B7280] dark:text-gray-400 mb-2 sm:mb-3">Items</p>
+              <p className="text-xs font-semibold text-[#6B7280] dark:text-gray-400 mb-2 sm:mb-3">
+                Items
+              </p>
               {/* Mobile: card per item */}
               <div className="sm:hidden space-y-3">
                 {items.map((item) => (
@@ -529,25 +734,46 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                     <p className="text-sm font-semibold text-[#111827] dark:text-white mb-2">
                       {item.product_name}
                       {item.tax_rate > 0 && (
-                        <span className="text-xs font-normal text-[#6B7280] dark:text-gray-400 ml-1">(Tax: {item.tax_rate}%)</span>
+                        <span className="text-xs font-normal text-[#6B7280] dark:text-gray-400 ml-1">
+                          (Tax: {item.tax_rate}%)
+                        </span>
                       )}
                     </p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                      <span className="text-[#6B7280] dark:text-gray-400">Qty</span>
-                      <span className="text-right font-medium text-[#111827] dark:text-white">{item.quantity}</span>
-                      <span className="text-[#6B7280] dark:text-gray-400">Unit price</span>
-                      <span className="text-right font-medium text-[#111827] dark:text-white">{formatAmount(item.unit_price)}</span>
-                      <span className="text-[#6B7280] dark:text-gray-400">Tax</span>
-                      <span className="text-right font-medium text-[#111827] dark:text-white">{formatAmount(item.tax_amount)}</span>
-                      <span className="text-[#6B7280] dark:text-gray-400">Line total</span>
-                      <span className="text-right font-semibold text-[#111827] dark:text-white">{formatAmount(item.total)}</span>
+                      <span className="text-[#6B7280] dark:text-gray-400">
+                        Qty
+                      </span>
+                      <span className="text-right font-medium text-[#111827] dark:text-white">
+                        {item.quantity}
+                      </span>
+                      <span className="text-[#6B7280] dark:text-gray-400">
+                        Unit price
+                      </span>
+                      <span className="text-right font-medium text-[#111827] dark:text-white">
+                        {formatAmount(item.unit_price)}
+                      </span>
+                      <span className="text-[#6B7280] dark:text-gray-400">
+                        Tax
+                      </span>
+                      <span className="text-right font-medium text-[#111827] dark:text-white">
+                        {formatAmount(item.tax_amount)}
+                      </span>
+                      <span className="text-[#6B7280] dark:text-gray-400">
+                        Line total
+                      </span>
+                      <span className="text-right font-semibold text-[#111827] dark:text-white">
+                        {formatAmount(item.total)}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
               {/* Desktop: table */}
               <div className="hidden sm:block overflow-x-auto -mx-1">
-                <table className="w-full border-collapse min-w-[480px]" style={{ tableLayout: "fixed" }}>
+                <table
+                  className="w-full border-collapse min-w-[480px]"
+                  style={{ tableLayout: "fixed" }}
+                >
                   <colgroup>
                     <col style={{ width: "40%" }} />
                     <col style={{ width: "12%" }} />
@@ -557,26 +783,51 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                   </colgroup>
                   <thead>
                     <tr className="border-b-2 border-[#E5E7EB] dark:border-gray-700">
-                      <th className="text-left py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">Item</th>
-                      <th className="text-right py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">Qty</th>
-                      <th className="text-right py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">Price</th>
-                      <th className="text-right py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">Tax</th>
-                      <th className="text-right py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">Total</th>
+                      <th className="text-left py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">
+                        Item
+                      </th>
+                      <th className="text-right py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">
+                        Qty
+                      </th>
+                      <th className="text-right py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">
+                        Price
+                      </th>
+                      <th className="text-right py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">
+                        Tax
+                      </th>
+                      <th className="text-right py-3 px-2 text-sm font-semibold text-[#111827] dark:text-white">
+                        Total
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item) => (
-                      <tr key={item.id} className="border-b border-[#E5E7EB] dark:border-gray-700">
+                      <tr
+                        key={item.id}
+                        className="border-b border-[#E5E7EB] dark:border-gray-700"
+                      >
                         <td className="py-3 px-2 text-sm text-[#111827] dark:text-white align-top">
-                          <span className="font-medium">{item.product_name}</span>
+                          <span className="font-medium">
+                            {item.product_name}
+                          </span>
                           {item.tax_rate > 0 && (
-                            <span className="text-xs text-[#6B7280] dark:text-gray-400 ml-1">(Tax: {item.tax_rate}%)</span>
+                            <span className="text-xs text-[#6B7280] dark:text-gray-400 ml-1">
+                              (Tax: {item.tax_rate}%)
+                            </span>
                           )}
                         </td>
-                        <td className="py-3 px-2 text-sm text-right text-[#111827] dark:text-white align-top">{item.quantity}</td>
-                        <td className="py-3 px-2 text-sm text-right text-[#111827] dark:text-white align-top">{formatAmount(item.unit_price)}</td>
-                        <td className="py-3 px-2 text-sm text-right text-[#111827] dark:text-white align-top">{formatAmount(item.tax_amount)}</td>
-                        <td className="py-3 px-2 text-sm text-right font-semibold text-[#111827] dark:text-white align-top">{formatAmount(item.total)}</td>
+                        <td className="py-3 px-2 text-sm text-right text-[#111827] dark:text-white align-top">
+                          {item.quantity}
+                        </td>
+                        <td className="py-3 px-2 text-sm text-right text-[#111827] dark:text-white align-top">
+                          {formatAmount(item.unit_price)}
+                        </td>
+                        <td className="py-3 px-2 text-sm text-right text-[#111827] dark:text-white align-top">
+                          {formatAmount(item.tax_amount)}
+                        </td>
+                        <td className="py-3 px-2 text-sm text-right font-semibold text-[#111827] dark:text-white align-top">
+                          {formatAmount(item.total)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -588,18 +839,30 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
             <div className="flex justify-end mb-5">
               <div className="w-full sm:w-64 border border-[#E5E7EB] dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
                 <div className="flex justify-between py-1.5 border-b border-[#E5E7EB] dark:border-gray-700">
-                  <span className="text-sm text-[#6B7280] dark:text-gray-400">Subtotal</span>
-                  <span className="text-sm font-semibold text-[#111827] dark:text-white">{formatAmount(totals.subtotal)}</span>
+                  <span className="text-sm text-[#6B7280] dark:text-gray-400">
+                    Subtotal
+                  </span>
+                  <span className="text-sm font-semibold text-[#111827] dark:text-white">
+                    {formatAmount(totals.subtotal)}
+                  </span>
                 </div>
                 {totals.totalTax > 0 && (
                   <div className="flex justify-between py-1.5 border-b border-[#E5E7EB] dark:border-gray-700">
-                    <span className="text-sm text-[#6B7280] dark:text-gray-400">Tax</span>
-                    <span className="text-sm font-semibold text-[#111827] dark:text-white">{formatAmount(totals.totalTax)}</span>
+                    <span className="text-sm text-[#6B7280] dark:text-gray-400">
+                      Tax
+                    </span>
+                    <span className="text-sm font-semibold text-[#111827] dark:text-white">
+                      {formatAmount(totals.totalTax)}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between items-center py-2 mt-2">
-                  <span className="text-base font-bold text-[#111827] dark:text-white">Total</span>
-                  <span className="text-lg font-bold text-[#22C55E] dark:text-green-500">{formatAmount(totals.total)}</span>
+                  <span className="text-base font-bold text-[#111827] dark:text-white">
+                    Total
+                  </span>
+                  <span className="text-lg font-bold text-[#22C55E] dark:text-green-500">
+                    {formatAmount(totals.total)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -609,14 +872,22 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
               <div className="border-t-2 border-[#E5E7EB] dark:border-gray-700 pt-5">
                 {formData.notes && (
                   <div className="mb-3">
-                    <h3 className="text-sm font-semibold text-[#111827] dark:text-white mb-1">Notes</h3>
-                    <p className="text-sm text-[#6B7280] dark:text-gray-400 break-words">{formData.notes}</p>
+                    <h3 className="text-sm font-semibold text-[#111827] dark:text-white mb-1">
+                      Notes
+                    </h3>
+                    <p className="text-sm text-[#6B7280] dark:text-gray-400 break-words">
+                      {formData.notes}
+                    </p>
                   </div>
                 )}
                 {formData.terms && (
                   <div>
-                    <h3 className="text-sm font-semibold text-[#111827] dark:text-white mb-1">Terms & Conditions</h3>
-                    <p className="text-sm text-[#6B7280] dark:text-gray-400 break-words">{formData.terms}</p>
+                    <h3 className="text-sm font-semibold text-[#111827] dark:text-white mb-1">
+                      Terms & Conditions
+                    </h3>
+                    <p className="text-sm text-[#6B7280] dark:text-gray-400 break-words">
+                      {formData.terms}
+                    </p>
                   </div>
                 )}
               </div>
@@ -659,7 +930,10 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
 
       {/* Add / Edit Item Modal */}
       {showAddItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setShowAddItemModal(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setShowAddItemModal(false)}
+        >
           <div
             className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
@@ -678,7 +952,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
             </div>
             <div className="p-4 overflow-y-auto space-y-4">
               <div>
-                <label className="text-xs font-medium text-[#6B7280] dark:text-gray-400 mb-1 block">Product</label>
+                <label className="text-xs font-medium text-[#6B7280] dark:text-gray-400 mb-1 block">
+                  Product
+                </label>
                 <Autocomplete
                   value={modalItem.product_id.toString()}
                   onValueChange={(value) => {
@@ -701,42 +977,67 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-[#6B7280] dark:text-gray-400 mb-1 block">Quantity</label>
+                  <label className="text-xs font-medium text-[#6B7280] dark:text-gray-400 mb-1 block">
+                    Quantity
+                  </label>
                   <input
                     type="number"
                     min={1}
                     value={modalItem.quantity}
-                    onChange={(e) => setModalItem((prev) => ({ ...prev, quantity: parseFloat(e.target.value) || 1 }))}
+                    onChange={(e) =>
+                      setModalItem((prev) => ({
+                        ...prev,
+                        quantity: parseFloat(e.target.value) || 1,
+                      }))
+                    }
                     className="w-full px-3 py-2 rounded-lg border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-[#6B7280] dark:text-gray-400 mb-1 block">Unit price (₹)</label>
+                  <label className="text-xs font-medium text-[#6B7280] dark:text-gray-400 mb-1 block">
+                    Unit price (₹)
+                  </label>
                   <input
                     type="number"
                     min={0}
                     step="0.01"
                     value={modalItem.unit_price}
-                    onChange={(e) => setModalItem((prev) => ({ ...prev, unit_price: parseFloat(e.target.value) || 0 }))}
+                    onChange={(e) =>
+                      setModalItem((prev) => ({
+                        ...prev,
+                        unit_price: parseFloat(e.target.value) || 0,
+                      }))
+                    }
                     className="w-full px-3 py-2 rounded-lg border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white"
                   />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium text-[#6B7280] dark:text-gray-400 mb-1 block">Tax rate (%)</label>
+                <label className="text-xs font-medium text-[#6B7280] dark:text-gray-400 mb-1 block">
+                  Tax rate (%)
+                </label>
                 <input
                   type="number"
                   min={0}
                   step="0.01"
                   value={modalItem.tax_rate}
-                  onChange={(e) => setModalItem((prev) => ({ ...prev, tax_rate: parseFloat(e.target.value) || 0 }))}
+                  onChange={(e) =>
+                    setModalItem((prev) => ({
+                      ...prev,
+                      tax_rate: parseFloat(e.target.value) || 0,
+                    }))
+                  }
                   className="w-full px-3 py-2 rounded-lg border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white"
                 />
               </div>
               <div className="py-2 px-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-[#E5E7EB] dark:border-gray-700">
                 <div className="flex justify-between text-sm">
-                  <span className="text-[#6B7280] dark:text-gray-400">Line total</span>
-                  <span className="font-semibold text-[#111827] dark:text-white">{formatAmount(modalItemTotal)}</span>
+                  <span className="text-[#6B7280] dark:text-gray-400">
+                    Line total
+                  </span>
+                  <span className="font-semibold text-[#111827] dark:text-white">
+                    {formatAmount(modalItemTotal)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -779,16 +1080,20 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                 if (errors.party_id) setErrors({ ...errors, party_id: "" });
               }}
               options={parties
-                .filter(p => p.type === "customer" || p.type === "both")
-                .map(party => ({
+                .filter((p) => p.type === "customer" || p.type === "both")
+                .map((party) => ({
                   value: party.id.toString(),
-                  label: `${party.name}${party.mobile ? ` - ${party.mobile}` : ""}`
+                  label: `${party.name}${party.mobile ? ` - ${party.mobile}` : ""}`,
                 }))}
               placeholder="Select customer"
-              className={errors.party_id ? "border-red-300 dark:border-red-700" : ""}
+              className={
+                errors.party_id ? "border-red-300 dark:border-red-700" : ""
+              }
             />
             {errors.party_id && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.party_id}</p>
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.party_id}
+              </p>
             )}
           </div>
 
@@ -802,7 +1107,8 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
               value={formData.invoice_number}
               onChange={(e) => {
                 setFormData({ ...formData, invoice_number: e.target.value });
-                if (errors.invoice_number) setErrors({ ...errors, invoice_number: "" });
+                if (errors.invoice_number)
+                  setErrors({ ...errors, invoice_number: "" });
               }}
               placeholder="INV-20240101-001"
               className={`w-full px-4 py-3 rounded-xl border ${
@@ -812,7 +1118,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
               } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
             />
             {errors.invoice_number && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.invoice_number}</p>
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.invoice_number}
+              </p>
             )}
           </div>
 
@@ -826,7 +1134,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
               <input
                 type="date"
                 value={formData.invoice_date}
-                onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, invoice_date: e.target.value })
+                }
                 className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white"
               />
             </div>
@@ -842,13 +1152,19 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                 [
                   { value: "unpaid" as const, label: "Unpaid", icon: Wallet },
                   { value: "paid" as const, label: "Paid", icon: CheckCircle2 },
-                  { value: "partially_paid" as const, label: "Partial", icon: CircleDollarSign },
+                  {
+                    value: "partially_paid" as const,
+                    label: "Partial",
+                    icon: CircleDollarSign,
+                  },
                 ] as const
               ).map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, payment_status: value }))}
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, payment_status: value }))
+                  }
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all duration-200 ${
                     formData.payment_status === value
                       ? value === "paid"
@@ -874,7 +1190,12 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                   min="0"
                   step="0.01"
                   value={formData.paid_amount}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, paid_amount: e.target.value }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      paid_amount: e.target.value,
+                    }))
+                  }
                   placeholder={`Max ${formatAmount(calculateTotals().total)}`}
                   className={`w-full px-4 py-2.5 rounded-xl border ${
                     errors.paid_amount
@@ -883,7 +1204,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                   } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
                 />
                 {errors.paid_amount && (
-                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.paid_amount}</p>
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                    {errors.paid_amount}
+                  </p>
                 )}
               </div>
             )}
@@ -905,19 +1228,29 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
               </button>
             </div>
             {errors.items && (
-              <p className="mb-2 text-xs text-red-600 dark:text-red-400">{errors.items}</p>
+              <p className="mb-2 text-xs text-red-600 dark:text-red-400">
+                {errors.items}
+              </p>
             )}
-            
+
             {items.length > 0 ? (
               <div className="border border-[#E5E7EB] dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[#E5E7EB] dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                        <th className="text-left py-2.5 px-3 font-semibold text-[#111827] dark:text-white">Product</th>
-                        <th className="text-right py-2.5 px-2 font-semibold text-[#111827] dark:text-white">Qty</th>
-                        <th className="text-right py-2.5 px-2 font-semibold text-[#111827] dark:text-white">Price</th>
-                        <th className="text-right py-2.5 px-2 font-semibold text-[#111827] dark:text-white">Total</th>
+                        <th className="text-left py-2.5 px-3 font-semibold text-[#111827] dark:text-white">
+                          Product
+                        </th>
+                        <th className="text-right py-2.5 px-2 font-semibold text-[#111827] dark:text-white">
+                          Qty
+                        </th>
+                        <th className="text-right py-2.5 px-2 font-semibold text-[#111827] dark:text-white">
+                          Price
+                        </th>
+                        <th className="text-right py-2.5 px-2 font-semibold text-[#111827] dark:text-white">
+                          Total
+                        </th>
                         <th className="w-10 py-2.5 px-2" />
                       </tr>
                     </thead>
@@ -935,13 +1268,21 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                             >
                               {item.product_name}
                               {item.tax_rate > 0 && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">({item.tax_rate}% tax)</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
+                                  ({item.tax_rate}% tax)
+                                </span>
                               )}
                             </button>
                           </td>
-                          <td className="py-2.5 px-2 text-right text-[#111827] dark:text-white">{item.quantity}</td>
-                          <td className="py-2.5 px-2 text-right text-[#111827] dark:text-white">{formatAmount(item.unit_price)}</td>
-                          <td className="py-2.5 px-2 text-right font-semibold text-[#111827] dark:text-white">{formatAmount(item.total)}</td>
+                          <td className="py-2.5 px-2 text-right text-[#111827] dark:text-white">
+                            {item.quantity}
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-[#111827] dark:text-white">
+                            {formatAmount(item.unit_price)}
+                          </td>
+                          <td className="py-2.5 px-2 text-right font-semibold text-[#111827] dark:text-white">
+                            {formatAmount(item.total)}
+                          </td>
                           <td className="py-2.5 px-2">
                             <button
                               type="button"
@@ -963,8 +1304,12 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
                 className="border-2 border-dashed border-[#E5E7EB] dark:border-gray-700 rounded-xl p-6 text-center cursor-pointer hover:border-[#22C55E] dark:hover:border-green-500 hover:bg-green-50/50 dark:hover:bg-green-900/10 transition-colors"
               >
                 <FileText className="w-10 h-10 text-gray-400 dark:text-gray-500 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">No items yet</p>
-                <p className="text-sm text-[#22C55E] dark:text-green-400 font-medium">Tap to add your first item</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  No items yet
+                </p>
+                <p className="text-sm text-[#22C55E] dark:text-green-400 font-medium">
+                  Tap to add your first item
+                </p>
               </div>
             )}
           </div>
@@ -973,18 +1318,30 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
           {items.length > 0 && (
             <div className="bg-[#F9FAFB] dark:bg-gray-800 rounded-xl p-4 border border-[#E5E7EB] dark:border-gray-700">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-[#6B7280] dark:text-gray-400">Subtotal:</span>
-                <span className="text-sm font-semibold text-[#111827] dark:text-white">{formatAmount(totals.subtotal)}</span>
+                <span className="text-sm text-[#6B7280] dark:text-gray-400">
+                  Subtotal:
+                </span>
+                <span className="text-sm font-semibold text-[#111827] dark:text-white">
+                  {formatAmount(totals.subtotal)}
+                </span>
               </div>
               {totals.totalTax > 0 && (
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-[#6B7280] dark:text-gray-400">Tax:</span>
-                  <span className="text-sm font-semibold text-[#111827] dark:text-white">{formatAmount(totals.totalTax)}</span>
+                  <span className="text-sm text-[#6B7280] dark:text-gray-400">
+                    Tax:
+                  </span>
+                  <span className="text-sm font-semibold text-[#111827] dark:text-white">
+                    {formatAmount(totals.totalTax)}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between items-center pt-2 border-t border-[#E5E7EB] dark:border-gray-700">
-                <span className="text-base font-bold text-[#111827] dark:text-white">Total:</span>
-                <span className="text-lg font-bold text-[#22C55E] dark:text-green-400">{formatAmount(totals.total)}</span>
+                <span className="text-base font-bold text-[#111827] dark:text-white">
+                  Total:
+                </span>
+                <span className="text-lg font-bold text-[#22C55E] dark:text-green-400">
+                  {formatAmount(totals.total)}
+                </span>
               </div>
             </div>
           )}
@@ -996,7 +1353,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
             </label>
             <textarea
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, notes: e.target.value })
+              }
               placeholder="Additional notes or comments"
               rows={3}
               className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500 resize-none"
@@ -1010,7 +1369,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
             </label>
             <textarea
               value={formData.terms}
-              onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, terms: e.target.value })
+              }
               placeholder="Payment terms, delivery terms, etc."
               rows={3}
               className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500 resize-none"
@@ -1019,7 +1380,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
 
           {errors.submit && (
             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-              <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+              <p className="text-sm text-red-600 dark:text-red-400">
+                {errors.submit}
+              </p>
             </div>
           )}
 
@@ -1035,7 +1398,9 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || items.length === 0 || !formData.party_id}
+              disabled={
+                isSubmitting || items.length === 0 || !formData.party_id
+              }
               className={`flex-1 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
                 isSubmitting || items.length === 0 || !formData.party_id
                   ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
@@ -1060,4 +1425,3 @@ export default function CreateInvoice({ onBack, onGoToBills, onGoToDashboard }: 
     </div>
   );
 }
-

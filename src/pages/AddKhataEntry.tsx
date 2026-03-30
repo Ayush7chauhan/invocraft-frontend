@@ -1,7 +1,19 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, FileText, Calendar, DollarSign, ArrowUp, ArrowDown, Loader2, CheckCircle2, X, User, Search } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  Calendar,
+  DollarSign,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
+  CheckCircle2,
+  X,
+  Search,
+} from "lucide-react";
 import api from "../utils/api";
 import { Autocomplete } from "../components/ui/autocomplete";
+import axios from "axios";
 
 type Party = {
   id: number;
@@ -29,14 +41,16 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "debit" | "credit">("all");
-  
+  const [filterType, setFilterType] = useState<"all" | "debit" | "credit">(
+    "all",
+  );
+
   // Form state
   const [formData, setFormData] = useState({
     party_id: "",
     type: "credit" as "debit" | "credit",
     amount: "",
-    transaction_date: new Date().toISOString().split('T')[0],
+    transaction_date: new Date().toISOString().split("T")[0],
     note: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -51,12 +65,12 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/transactions');
+      const response = await api.get("/transactions");
       if (response.data.success) {
         setTransactions(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.error("Error fetching transactions:", error);
     } finally {
       setLoading(false);
     }
@@ -64,18 +78,18 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
 
   const fetchParties = async () => {
     try {
-      const response = await api.get('/parties');
+      const response = await api.get("/parties");
       if (response.data.success) {
         setParties(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching parties:', error);
+      console.error("Error fetching parties:", error);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newErrors: Record<string, string> = {};
     if (!formData.party_id) {
       newErrors.party_id = "Please select a party";
@@ -106,17 +120,21 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
 
       if (editingId) {
         // Update not implemented in backend yet, so we'll skip for now
-        alert('Update functionality coming soon');
+        alert("Update functionality coming soon");
       } else {
-        await api.post('/transactions', payload);
+        await api.post("/transactions", payload);
       }
 
       resetForm();
       fetchTransactions();
-      window.dispatchEvent(new CustomEvent('dashboard-refresh'));
-    } catch (error: any) {
+      window.dispatchEvent(
+        new CustomEvent("dashboard-refresh", { detail: {} }),
+      );
+    } catch (error: unknown) {
       setErrors({
-        submit: error.response?.data?.message || 'Failed to save transaction. Please try again.'
+        submit: axios.isAxiosError(error)
+          ? (error.response?.data?.message ?? "Failed to save transaction.")
+          : "Failed to save transaction.",
       });
     } finally {
       setIsSubmitting(false);
@@ -128,7 +146,7 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
       party_id: "",
       type: "credit",
       amount: "",
-      transaction_date: new Date().toISOString().split('T')[0],
+      transaction_date: new Date().toISOString().split("T")[0],
       note: "",
     });
     setErrors({});
@@ -136,17 +154,18 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
     setEditingId(null);
   };
 
-  const filteredTransactions = transactions.filter(tx => {
-    const matchesSearch = tx.party?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredTransactions = transactions.filter((tx) => {
+    const matchesSearch =
+      tx.party?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (tx.note && tx.note.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesType = filterType === "all" || tx.type === filterType;
     return matchesSearch && matchesType;
   });
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount);
   };
@@ -158,11 +177,15 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
     yesterday.setDate(yesterday.getDate() - 1);
 
     if (date.toDateString() === today.toDateString()) {
-      return 'Today';
+      return "Today";
     } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
+      return "Yesterday";
     } else {
-      return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      return date.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
     }
   };
 
@@ -210,23 +233,36 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
               <Autocomplete
                 value={formData.party_id}
                 onValueChange={(value) => {
-                  setFormData({ ...formData, party_id: value });
-                  if (errors.party_id) setErrors({ ...errors, party_id: "" });
+                  setFormData((prev) => ({ ...prev, party_id: value }));
+                  if (errors.party_id)
+                    setErrors((prev) => ({ ...prev, party_id: "" }));
                 }}
-                options={parties.map(party => ({
+                options={parties.map((party) => ({
                   value: party.id.toString(),
-                  label: `${party.name} (${party.type})`
+                  label: `${party.name} (${party.type})`,
                 }))}
                 placeholder="Select a party"
-                className={errors.party_id ? "border-red-300 dark:border-red-700" : ""}
+                className={
+                  errors.party_id ? "border-red-300 dark:border-red-700" : ""
+                }
                 disabled={parties.length === 0}
               />
               {errors.party_id && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.party_id}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.party_id}
+                </p>
               )}
               {parties.length === 0 && (
                 <p className="mt-1 text-xs text-[#6B7280] dark:text-gray-400">
-                  No parties found. <button type="button" onClick={() => onBack()} className="text-[#22C55E] dark:text-green-400 underline">Add a customer</button> first.
+                  No parties found.{" "}
+                  <button
+                    type="button"
+                    onClick={() => onBack()}
+                    className="text-[#22C55E] dark:text-green-400 underline"
+                  >
+                    Add a customer
+                  </button>{" "}
+                  first.
                 </p>
               )}
             </div>
@@ -276,7 +312,10 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
                   inputMode="decimal"
                   value={formData.amount}
                   onChange={(e) => {
-                    setFormData({ ...formData, amount: e.target.value.replace(/[^0-9.]/g, "") });
+                    setFormData({
+                      ...formData,
+                      amount: e.target.value.replace(/[^0-9.]/g, ""),
+                    });
                     if (errors.amount) setErrors({ ...errors, amount: "" });
                   }}
                   placeholder="Enter amount"
@@ -286,7 +325,9 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
                 />
               </div>
               {errors.amount && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.amount}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.amount}
+                </p>
               )}
             </div>
 
@@ -301,14 +342,20 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
                   type="date"
                   value={formData.transaction_date}
                   onChange={(e) => {
-                    setFormData({ ...formData, transaction_date: e.target.value });
-                    if (errors.transaction_date) setErrors({ ...errors, transaction_date: "" });
+                    setFormData({
+                      ...formData,
+                      transaction_date: e.target.value,
+                    });
+                    if (errors.transaction_date)
+                      setErrors({ ...errors, transaction_date: "" });
                   }}
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white"
                 />
               </div>
               {errors.transaction_date && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.transaction_date}</p>
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {errors.transaction_date}
+                </p>
               )}
             </div>
 
@@ -319,7 +366,9 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
               </label>
               <textarea
                 value={formData.note}
-                onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, note: e.target.value })
+                }
                 placeholder="Add a note about this transaction"
                 rows={3}
                 className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500 resize-none"
@@ -328,7 +377,9 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
 
             {errors.submit && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {errors.submit}
+                </p>
               </div>
             )}
 
@@ -381,7 +432,11 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
                       : "bg-gray-100 dark:bg-gray-800 text-[#374151] dark:text-gray-300"
                   }`}
                 >
-                  {type === "credit" ? "Credit (In)" : type === "debit" ? "Debit (Out)" : "All"}
+                  {type === "credit"
+                    ? "Credit (In)"
+                    : type === "debit"
+                      ? "Debit (Out)"
+                      : "All"}
                 </button>
               ))}
             </div>
@@ -396,8 +451,12 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
             ) : filteredTransactions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <FileText className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">No transactions found</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">Add your first khata entry</p>
+                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">
+                  No transactions found
+                </p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">
+                  Add your first khata entry
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -415,13 +474,15 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
                             <ArrowUp className="w-5 h-5 text-red-600 dark:text-red-400" />
                           )}
                           <h3 className="text-base font-bold text-[#111827] dark:text-white truncate">
-                            {tx.party?.name || 'Unknown'}
+                            {tx.party?.name || "Unknown"}
                           </h3>
-                          <span className={`px-2 py-0.5 rounded-lg text-xs font-medium ${
-                            tx.type === "credit"
-                              ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                              : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
-                          }`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-lg text-xs font-medium ${
+                              tx.type === "credit"
+                                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                                : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                            }`}
+                          >
                             {tx.type === "credit" ? "Credit" : "Debit"}
                           </span>
                         </div>
@@ -436,12 +497,16 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
                           {tx.party?.type && (
                             <>
                               <span>•</span>
-                              <span className="capitalize">{tx.party.type}</span>
+                              <span className="capitalize">
+                                {tx.party.type}
+                              </span>
                             </>
                           )}
                         </div>
                         {tx.note && (
-                          <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-2">{tx.note}</p>
+                          <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-2">
+                            {tx.note}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -455,4 +520,3 @@ export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
     </div>
   );
 }
-

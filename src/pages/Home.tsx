@@ -10,6 +10,7 @@ import {
   Loader2,
 } from "lucide-react";
 import api from "../utils/api";
+import axios from "axios";
 
 type HomeProps = {
   onSubmit: (mobile: string) => void;
@@ -18,28 +19,71 @@ type HomeProps = {
 export default function Home({ onSubmit }: HomeProps) {
   const [mobile, setMobile] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isDevLoggingIn, setIsDevLoggingIn] = useState(false);
   const [error, setError] = useState("");
   const isValidMobile = useMemo(() => /^[6-9]\d{9}$/.test(mobile), [mobile]);
 
+  const handleDevLogin = async () => {
+    setIsDevLoggingIn(true);
+    try {
+      const response = await api.post('/dev/auto-login');
+      if (response.data.success) {
+        const user = response.data.data.user;
+        const token = response.data.data.token;
+        
+        localStorage.setItem('temp_user', JSON.stringify(user));
+        localStorage.setItem('temp_mobile', user.mobile_number);
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        window.location.reload();
+      }
+    } catch (err) {
+      setError("Dev login failed. Check backend seeders.");
+      console.error(err);
+    } finally {
+      setIsDevLoggingIn(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!isValidMobile) return;
-    
+
     setIsLoading(true);
     setError("");
-    
+
+    const startTime = Date.now();
+
     try {
-      const response = await api.post('/send-otp', {
-        mobile_number: mobile
+      const response = await api.post("/send-otp", {
+        mobile_number: mobile,
       });
 
+      const elapsed = Date.now() - startTime;
+      const minDelay = 1500;
+      if (elapsed < minDelay) {
+        await new Promise((resolve) => setTimeout(resolve, minDelay - elapsed));
+      }
+
       if (response.data.success) {
-        localStorage.setItem('temp_mobile', mobile);
+        localStorage.setItem("temp_mobile", mobile);
         onSubmit(mobile);
       } else {
-        setError(response.data.message || 'Failed to send OTP');
+        setError(response.data.message || "Failed to send OTP");
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+    } catch (err: unknown) {
+      const elapsed = Date.now() - startTime;
+      const minDelay = 1500;
+      if (elapsed < minDelay) {
+        await new Promise((resolve) => setTimeout(resolve, minDelay - elapsed));
+      }
+
+      setError(
+        axios.isAxiosError(err)
+          ? (err.response?.data?.message ??
+              "Failed to send OTP. Please try again.")
+          : "Failed to send OTP. Please try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -122,22 +166,50 @@ export default function Home({ onSubmit }: HomeProps) {
           )}
         </button>
 
+        {import.meta.env.DEV && (
+          <button
+            className="w-full mt-4 font-semibold py-3 rounded-xl flex items-center justify-center gap-2 bg-yellow-400 text-yellow-900 hover:bg-yellow-500 transition shadow-sm"
+            onClick={handleDevLogin}
+            disabled={isDevLoggingIn}
+          >
+            {isDevLoggingIn ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Logging in...
+              </>
+            ) : (
+              <>
+                🚀 [DEV] Fast Auto-Login
+              </>
+            )}
+          </button>
+        )}
+
         <div className="flex items-center gap-2 mt-8 text-[#16A34A] dark:text-green-400">
           <ShieldCheck className="w-5 h-5" />
-          <span className="text-sm text-[#374151] dark:text-gray-300">Secure &amp; Fast Login</span>
+          <span className="text-sm text-[#374151] dark:text-gray-300">
+            Secure &amp; Fast Login
+          </span>
         </div>
 
         <div className="mt-8 text-xs text-[#6B7280] dark:text-gray-400">
           <p>By continuing, you agree to our</p>
-          <p className="text-[#22C55E] dark:text-green-400 underline mt-1">Terms of Service</p>
+          <p className="text-[#22C55E] dark:text-green-400 underline mt-1">
+            Terms of Service
+          </p>
           <p className="mt-1">and</p>
-          <p className="text-[#22C55E] dark:text-green-400 underline mt-1">Privacy Policy</p>
+          <p className="text-[#22C55E] dark:text-green-400 underline mt-1">
+            Privacy Policy
+          </p>
         </div>
 
         <div className="w-full border-t border-[#F3F4F6] dark:border-gray-800 mt-8 pt-6 flex justify-between">
           <Feature icon={<Clock className="w-5 h-5" />} label="Quick Login" />
           <Feature icon={<Lock className="w-5 h-5" />} label="Secure" />
-          <Feature icon={<Smartphone className="w-5 h-5" />} label="No Password" />
+          <Feature
+            icon={<Smartphone className="w-5 h-5" />}
+            label="No Password"
+          />
         </div>
       </div>
     </div>
