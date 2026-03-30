@@ -17,7 +17,7 @@ export default function Login() {
 
   // Add styles to head
   useEffect(() => {
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.textContent = `
       @keyframes login-card-in {
         0% {
@@ -99,12 +99,13 @@ export default function Login() {
       .login-feature-3 { opacity: 0; animation: login-feature-in 0.35s ease-out 1s forwards; }
     `;
     document.head.appendChild(style);
+
     return () => {
       document.head.removeChild(style);
     };
   }, []);
 
-  // ✅ clean validation
+  // Validation
   const isValidMobile = useMemo(() => {
     return /^[6-9]\d{9}$/.test(mobile);
   }, [mobile]);
@@ -124,10 +125,9 @@ export default function Login() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 px-4 relative overflow-hidden">
         {/* Background glow */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(34,197,94,0.08),transparent)] dark:bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(34,197,94,0.06),transparent)] pointer-events-none" />
+
         {/* Card */}
-        <div
-          className="login-card relative z-10 w-full max-w-sm min-h-[550px] max-h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-xl hover:shadow-2xl transition-shadow duration-300 p-6 flex flex-col justify-between border border-gray-100 dark:border-gray-700"
-        >
+        <div className="login-card relative z-10 w-full max-w-sm min-h-[550px] max-h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-xl hover:shadow-2xl transition-shadow duration-300 p-6 flex flex-col justify-between border border-gray-100 dark:border-gray-700">
           {/* Top */}
           <div>
             {/* Logo */}
@@ -155,93 +155,109 @@ export default function Login() {
               We will send you a one-time password (OTP)
             </p>
 
-          {/* Input */}
-          <div className="login-stagger-4 mt-8">
-            <label className="text-sm font-medium text-gray-700">
-              Mobile Number
-            </label>
+            {/* Input */}
+            <div className="login-stagger-4 mt-8">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Mobile Number
+              </label>
 
-            <div
-              className={`
-                flex items-center gap-2
-                border rounded-lg mt-2 px-3 py-3
-                transition
-                ${
-                  error
-                    ? "border-red-500 ring-1 ring-red-200"
-                    : "focus-within:border-green-600 focus-within:ring-2 focus-within:ring-green-100"
-                }
-              `}
-            >
-              <Phone size={18} className="text-gray-400" />
-              <span className="text-gray-600 text-sm">+91</span>
+              <div
+                className={`
+                  flex items-center gap-2
+                  border rounded-lg mt-2 px-3 py-3
+                  transition
+                  ${
+                    error
+                      ? "border-red-500 ring-1 ring-red-200"
+                      : "focus-within:border-green-600 focus-within:ring-2 focus-within:ring-green-100"
+                  }
+                `}
+              >
+                <Phone size={18} className="text-gray-400" />
+                <span className="text-gray-600 dark:text-gray-300 text-sm">
+                  +91
+                </span>
 
-              <input
-                type="tel"
-                inputMode="numeric"
-                maxLength={10}
-                value={mobile}
-                onChange={(e) => {
-                  setMobile(e.target.value.replace(/\D/g, ""));
-                  setError("");
-                }}
-                placeholder="Enter 10-digit mobile number"
-                className="w-full outline-none text-sm"
-              />
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={mobile}
+                  onChange={(e) => {
+                    setMobile(e.target.value.replace(/\D/g, ""));
+                    setError("");
+                  }}
+                  placeholder="Enter 10-digit mobile number"
+                  className="w-full outline-none text-sm bg-transparent text-gray-900 dark:text-white placeholder:text-gray-400"
+                />
+              </div>
+
+              {/* Error */}
+              {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+
+              {!error && (
+                <div className="flex justify-start items-center gap-1 mt-2 text-green-600">
+                  <CircleAlert className="w-5 h-5 pt-1" />
+                  <p className="text-xs text-gray-400 mt-1">
+                    OTP will be sent via SMS
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Error */}
-            {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+            {/* Button */}
+            <button
+              onClick={handleSubmit}
+              disabled={!mobile}
+              className="
+                w-full mt-8 py-3 rounded-lg font-semibold
+                bg-green-600 text-white
+                hover:bg-green-700
+                active:scale-95
+                disabled:bg-green-300 disabled:cursor-not-allowed
+                transition-all duration-200
+              "
+            >
+              Get OTP
+            </button>
 
-            {!error && (
-              <div className="flex justify-start items-center gap-1 mt-2 text-green-600">
-                <CircleAlert className="w-5 h-5 pt-1" />
-                <p className="text-xs text-gray-400 mt-1">
-                  OTP will be sent via SMS
-                </p>
-              </div>
-            )}
+            <ShieldCheck className="mx-auto mt-4 text-green-600 dark:text-green-400" />
+            <p className="text-center text-sm text-gray-600 dark:text-gray-300 mt-4">
+              Secure & Fast Login
+            </p>
           </div>
 
-          {/* Button */}
-          <button
-            onClick={handleSubmit}
-            disabled={!mobile}
-            className="
-              w-full mt-8 py-3 rounded-lg font-semibold
-              bg-green-600 text-white
-              hover:bg-green-700
-              active:scale-95
-              disabled:bg-green-300 disabled:cursor-not-allowed
-              transition-all duration-200
-            "
-          >
-            Get OTP
-          </button>
-          <ShieldCheck className="mx-auto mt-4" />
-          <p className="text-center text-sm text-gray-600 mt-4">
-            Secure & Fast Login
-          </p>
-        </div>
+          {/* Footer */}
+          <div>
+            <p className="text-center text-xs text-gray-400">
+              By continuing, you agree to our{" "}
+              <span className="text-green-600 hover:underline cursor-pointer">
+                Terms of Service
+              </span>{" "}
+              and{" "}
+              <span className="text-green-600 hover:underline cursor-pointer">
+                Privacy Policy
+              </span>
+            </p>
 
-        {/* Footer */}
-        <div>
-          <p className="text-center text-xs text-gray-400">
-            By continuing, you agree to our{" "}
-            <span className="text-green-600 hover:underline cursor-pointer">
-              Terms of Service
-            </span>{" "}
-            and{" "}
-            <span className="text-green-600 hover:underline cursor-pointer">
-              Privacy Policy
-            </span>
-          </p>
-
-          {/* Feature icons - equal width, centered */}
-          <div className="grid grid-cols-3 gap-4 mt-6 w-full max-w-xs mx-auto">
-            <Feature icon={<Clock size={22} />} label="Quick Login" className="login-feature-1" />
-            <Feature icon={<Lock size={22} />} label="Secure" className="login-feature-2" />
-            <Feature icon={<Smartphone size={22} />} label="No Password" className="login-feature-3" />
+            {/* Feature icons */}
+            <div className="grid grid-cols-3 gap-4 mt-6 w-full max-w-xs mx-auto">
+              <Feature
+                icon={<Clock size={22} />}
+                label="Quick Login"
+                className="login-feature-1"
+              />
+              <Feature
+                icon={<Lock size={22} />}
+                label="Secure"
+                className="login-feature-2"
+              />
+              <Feature
+                icon={<Smartphone size={22} />}
+                label="No Password"
+                className="login-feature-3"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -249,14 +265,26 @@ export default function Login() {
   );
 }
 
-/* 🔁 Reusable mini component - fixed size and alignment */
-function Feature({ icon, label, className = "" }: { icon: React.ReactNode; label: string; className?: string }) {
+/* Reusable mini component */
+function Feature({
+  icon,
+  label,
+  className = "",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  className?: string;
+}) {
   return (
-    <div className={`flex flex-col items-center justify-center min-w-0 ${className}`}>
+    <div
+      className={`flex flex-col items-center justify-center min-w-0 ${className}`}
+    >
       <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-700/60 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-700 hover:scale-105 transition-all duration-200 shrink-0">
         {icon}
       </div>
-      <p className="text-xs mt-2 text-center text-gray-600 dark:text-gray-400 font-medium leading-tight">{label}</p>
+      <p className="text-xs mt-2 text-center text-gray-600 dark:text-gray-400 font-medium leading-tight">
+        {label}
+      </p>
     </div>
   );
 }
