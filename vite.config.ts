@@ -19,10 +19,10 @@ export default defineConfig({
     },
   },
   server: {
-    host: true, // Listen on all local IPs
+    host: true,
     proxy: {
       "/api": {
-        target: "http://10.179.146.230:6969",
+        target: "http://100.48.47.44",
         changeOrigin: true,
         secure: false,
       },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Store,
   User,
@@ -13,6 +13,7 @@ import {
   Loader2,
   CheckCircle,
 } from "lucide-react";
+import axios from "axios";
 import api from "../utils/api";
 
 type SetupShopProps = {
@@ -20,55 +21,78 @@ type SetupShopProps = {
   onContinue: () => void;
 };
 
+type BusinessType = "grocery" | "medical" | "general" | "other";
+
+type TempUser = {
+  id?: number | string;
+};
+
+type UpdateShopPayload = {
+  user_id: number;
+  owner_name: string;
+  is_registration_complete: boolean;
+  shop_name?: string;
+  shop_address?: string;
+  business_type?: BusinessType;
+};
+
 export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [shopAddress, setShopAddress] = useState("");
-  const [businessType, setBusinessType] = useState<
-    "grocery" | "medical" | "general" | "other" | null
-  >(null);
+  const [businessType, setBusinessType] = useState<BusinessType | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isFormValid, setIsFormValid] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const successTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const validate = () => {
-      const newErrors: Record<string, string> = {};
-      
-      // Shop name is optional - no validation needed
-      
-      // Owner name is required
-      if (!ownerName.trim()) {
-        // Don't show error until user tries to submit
-      } else if (ownerName.trim().length < 2) {
-        newErrors.ownerName = "Owner name must be at least 2 characters";
-      }
+    const newErrors: Record<string, string> = {};
 
-      // Shop address is optional, but if provided, validate length
-      if (shopAddress.trim() && shopAddress.trim().length < 10) {
-        newErrors.shopAddress = "Address must be at least 10 characters";
-      }
+    if (ownerName.trim() && ownerName.trim().length < 2) {
+      newErrors.ownerName = "Owner name must be at least 2 characters";
+    }
 
-      setErrors(newErrors);
-      setIsFormValid(
-        ownerName.trim().length >= 2 &&
-        (!shopAddress.trim() || shopAddress.trim().length >= 10)
-      );
+    if (shopAddress.trim() && shopAddress.trim().length < 10) {
+      newErrors.shopAddress = "Address must be at least 10 characters";
+    }
+
+    setErrors((prev) => ({
+      ...prev,
+      ownerName: newErrors.ownerName || "",
+      shopAddress: newErrors.shopAddress || "",
+    }));
+
+    setIsFormValid(
+      ownerName.trim().length >= 2 &&
+        (!shopAddress.trim() || shopAddress.trim().length >= 10),
+    );
+  }, [ownerName, shopAddress]);
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        window.clearTimeout(successTimeoutRef.current);
+      }
     };
-
-    validate();
-  }, [shopName, ownerName, shopAddress]);
+  }, []);
 
   const handleSubmit = async () => {
-    // Validate before submit
+    const submitErrors: Record<string, string> = {};
+
     if (!ownerName.trim()) {
-      setErrors({ ownerName: "Owner name is required" });
-      return;
+      submitErrors.ownerName = "Owner name is required";
+    } else if (ownerName.trim().length < 2) {
+      submitErrors.ownerName = "Owner name must be at least 2 characters";
     }
-    
-    if (ownerName.trim().length < 2) {
-      setErrors({ ownerName: "Owner name must be at least 2 characters" });
+
+    if (shopAddress.trim() && shopAddress.trim().length < 10) {
+      submitErrors.shopAddress = "Address must be at least 10 characters";
+    }
+
+    if (Object.keys(submitErrors).length > 0) {
+      setErrors((prev) => ({ ...prev, ...submitErrors }));
       return;
     }
 
@@ -78,50 +102,74 @@ export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
     setErrors({});
 
     try {
-      const tempUser = JSON.parse(localStorage.getItem('temp_user') || '{}');
-      
-      const payload: any = {
-        user_id: tempUser.id,
+      let tempUser: TempUser = {};
+
+      try {
+        tempUser = JSON.parse(localStorage.getItem("temp_user") || "{}");
+      } catch {
+        tempUser = {};
+      }
+
+      const userId = Number(tempUser.id);
+
+      if (!userId || Number.isNaN(userId)) {
+        setErrors({ submit: "User session not found. Please login again." });
+        return;
+      }
+
+      const payload: UpdateShopPayload = {
+        user_id: userId,
         owner_name: ownerName.trim(),
-        is_registration_complete: true
+        is_registration_complete: true,
       };
 
-      // Only include fields if they have values
       if (shopName.trim()) {
         payload.shop_name = shopName.trim();
       }
+
       if (shopAddress.trim()) {
         payload.shop_address = shopAddress.trim();
       }
+
       if (businessType) {
         payload.business_type = businessType;
       }
 
-      const response = await api.post('/update-shop-details', payload);
+      const response = await api.post("/update-shop-details", payload);
 
-      if (response.data.success) {
+      if (response.data?.success) {
         setIsSuccess(true);
-        
-        // Store user data with token
+
         const userData = {
           ...response.data.data.user,
-          token: response.data.data.token
+          token: response.data.data.token,
         };
-        
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('auth_token', response.data.data.token);
-        localStorage.removeItem('temp_user');
-        localStorage.removeItem('temp_mobile');
-        
-        // Wait 1.5 seconds to show success, then navigate
-        setTimeout(() => {
+
+        localStorage.setItem("user", JSON.stringify(userData));
+        localStorage.setItem("auth_token", response.data.data.token);
+        localStorage.removeItem("temp_user");
+        localStorage.removeItem("temp_mobile");
+
+        successTimeoutRef.current = window.setTimeout(() => {
           onContinue();
         }, 1500);
       } else {
-        setErrors({ submit: response.data.message || 'Failed to save shop details' });
+        setErrors({
+          submit: response.data?.message || "Failed to save shop details",
+        });
       }
-    } catch (err: any) {
-      setErrors({ submit: err.response?.data?.message || 'Failed to save shop details. Please try again.' });
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        setErrors({
+          submit:
+            error.response?.data?.message ||
+            "Failed to save shop details. Please try again.",
+        });
+      } else {
+        setErrors({
+          submit: "Failed to save shop details. Please try again.",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -160,9 +208,11 @@ export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
           <div className="w-16 h-16 rounded-full bg-[#22C55E] dark:bg-green-600 flex items-center justify-center mb-4">
             <Store className="w-7 h-7 text-white" />
           </div>
+
           <h1 className="text-2xl font-bold text-[#111827] dark:text-white">
             Set Up Your Shop
           </h1>
+
           <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-2">
             Complete your profile to continue
           </p>
@@ -171,15 +221,22 @@ export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
         <div className="mt-8 border-t border-[#F3F4F6] dark:border-gray-800" />
 
         <div className="mt-6 space-y-5">
+          {/* Shop Name */}
           <div>
             <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
-              Shop Name <span className="text-[#9CA3AF] dark:text-gray-500">(Optional)</span>
+              Shop Name{" "}
+              <span className="text-[#9CA3AF] dark:text-gray-500">
+                (Optional)
+              </span>
             </label>
-            <div className={`mt-2 flex items-center border rounded-xl px-4 py-3 ${
-              errors.shopName 
-                ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20" 
-                : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
-            }`}>
+
+            <div
+              className={`mt-2 flex items-center border rounded-xl px-4 py-3 ${
+                errors.shopName
+                  ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
+                  : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
+              }`}
+            >
               <input
                 type="text"
                 placeholder="Enter your shop name (optional)"
@@ -187,27 +244,35 @@ export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
                 onChange={(e) => {
                   setShopName(e.target.value);
                   if (errors.shopName) {
-                    setErrors(prev => ({ ...prev, shopName: "" }));
+                    setErrors((prev) => ({ ...prev, shopName: "" }));
                   }
                 }}
                 className="w-full text-sm outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <StoreIcon className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
             </div>
+
             {errors.shopName && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.shopName}</p>
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.shopName}
+              </p>
             )}
           </div>
 
+          {/* Owner Name */}
           <div>
             <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
-              Owner Name <span className="text-[#EF4444] dark:text-red-400">*</span>
+              Owner Name{" "}
+              <span className="text-[#EF4444] dark:text-red-400">*</span>
             </label>
-            <div className={`mt-2 flex items-center border rounded-xl px-4 py-3 ${
-              errors.ownerName 
-                ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20" 
-                : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
-            }`}>
+
+            <div
+              className={`mt-2 flex items-center border rounded-xl px-4 py-3 ${
+                errors.ownerName
+                  ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
+                  : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
+              }`}
+            >
               <input
                 type="text"
                 placeholder="Enter your full name"
@@ -215,61 +280,80 @@ export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
                 onChange={(e) => {
                   setOwnerName(e.target.value);
                   if (errors.ownerName) {
-                    setErrors(prev => ({ ...prev, ownerName: "" }));
+                    setErrors((prev) => ({ ...prev, ownerName: "" }));
                   }
                 }}
                 className="w-full text-sm outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               />
               <User className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
             </div>
+
             {errors.ownerName && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.ownerName}</p>
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.ownerName}
+              </p>
             )}
           </div>
 
+          {/* Mobile */}
           <div>
             <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
               Mobile Number
             </label>
+
             <div className="mt-2 flex items-center gap-3 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
-              <span className="text-sm text-[#6B7280] dark:text-gray-400">{formatMobile(mobile)}</span>
+              <span className="text-sm text-[#6B7280] dark:text-gray-400">
+                {formatMobile(mobile)}
+              </span>
               <CheckCircle2 className="w-4 h-4 text-[#22C55E] dark:text-green-400" />
               <Phone className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
             </div>
           </div>
 
+          {/* Address */}
           <div>
             <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
-              Shop Address <span className="text-[#9CA3AF] dark:text-gray-500">(Optional)</span>
+              Shop Address{" "}
+              <span className="text-[#9CA3AF] dark:text-gray-500">
+                (Optional)
+              </span>
             </label>
-            <div className={`mt-2 flex items-start border rounded-xl px-4 py-3 ${
-              errors.shopAddress 
-                ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20" 
-                : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
-            }`}>
+
+            <div
+              className={`mt-2 flex items-start border rounded-xl px-4 py-3 ${
+                errors.shopAddress
+                  ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
+                  : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
+              }`}
+            >
               <textarea
                 placeholder="Enter your complete shop address"
                 value={shopAddress}
                 onChange={(e) => {
                   setShopAddress(e.target.value);
                   if (errors.shopAddress) {
-                    setErrors(prev => ({ ...prev, shopAddress: "" }));
+                    setErrors((prev) => ({ ...prev, shopAddress: "" }));
                   }
                 }}
                 rows={3}
                 className="w-full text-sm outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none"
               />
-              <MapPin className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500 mt-1 flex-shrink-0" />
+              <MapPin className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500 mt-1 shrink-0" />
             </div>
+
             {errors.shopAddress && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.shopAddress}</p>
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {errors.shopAddress}
+              </p>
             )}
           </div>
 
+          {/* Business Type */}
           <div>
             <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
               Business Type
             </label>
+
             <div className="mt-3 grid grid-cols-2 gap-3">
               <TypeButton
                 label="Grocery"
@@ -301,7 +385,9 @@ export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
 
         {errors.submit && (
           <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-600 dark:text-red-400">{errors.submit}</p>
+            <p className="text-sm text-red-600 dark:text-red-400">
+              {errors.submit}
+            </p>
           </div>
         )}
 
@@ -342,7 +428,7 @@ function TypeButton({
   onClick,
 }: {
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   selected: boolean;
   onClick: () => void;
 }) {

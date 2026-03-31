@@ -1,8 +1,7 @@
 import axios from "axios";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "/api/";
-
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
+console.warn("API Base URL:", API_BASE_URL); // debug log to verify correct URL
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -10,6 +9,7 @@ const api = axios.create({
     Accept: "application/json",
   },
   timeout: 10000,
+  withCredentials: false, // set true only if using cookies/sessions
 });
 
 api.interceptors.request.use(
@@ -28,6 +28,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem("auth_token");
+      window.location.href = "/login"; // optional: auto-redirect on token expiry
     }
     return Promise.reject(error);
   },

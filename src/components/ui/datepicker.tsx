@@ -6,11 +6,9 @@ type DatePickerProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   error?: string;
-  min?: string;
-  max?: string;
 };
 
-export function DatePicker({ value, onChange, placeholder = "Select date", error, min, max }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder = "Select date", error }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(value ? new Date(value) : null);
   const containerRef = useRef<HTMLDivElement>(null);

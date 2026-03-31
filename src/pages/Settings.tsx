@@ -1,5 +1,20 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Moon, Sun, Bell, User, Building2, Phone, MapPin, Save, Loader2, LogOut, Trash2, AlertCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Moon,
+  Sun,
+  Bell,
+  User,
+  Building2,
+  Phone,
+  MapPin,
+  Save,
+  Loader2,
+  LogOut,
+  Trash2,
+  Mail,
+} from "lucide-react";
+import axios from "axios";
 import { useTheme } from "../hooks/useTheme";
 import api from "../utils/api";
 import LogoutModal from "../components/LogoutModal";
@@ -9,20 +24,58 @@ type SettingsProps = {
   onLogout?: () => void;
 };
 
+type UserData = {
+  id: number;
+  shop_name?: string | null;
+  owner_name?: string | null;
+  shop_address?: string | null;
+  mobile_number?: string | null;
+  email?: string | null;
+  business_type?: string | null;
+  is_registration_complete?: boolean;
+};
+
+type FormDataState = {
+  shop_name: string;
+  owner_name: string;
+  shop_address: string;
+  mobile_number: string;
+  email: string;
+  business_type: string;
+};
+
+type NotificationSettings = {
+  lowStock: boolean;
+  paymentReminder: boolean;
+  newCustomer: boolean;
+  dailySummary: boolean;
+};
+
+type UpdateShopPayload = {
+  user_id: number;
+  shop_name: string | null;
+  owner_name: string;
+  shop_address: string | null;
+  business_type: string | null;
+  is_registration_complete: boolean;
+};
+
 export default function Settings({ onBack, onLogout }: SettingsProps) {
   const { isDarkMode, toggleTheme } = useTheme();
-  const [userData, setUserData] = useState<any>(null);
+
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [notifications, setNotifications] = useState({
+
+  const [notifications, setNotifications] = useState<NotificationSettings>({
     lowStock: true,
     paymentReminder: true,
     newCustomer: false,
     dailySummary: true,
   });
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataState>({
     shop_name: "",
     owner_name: "",
     shop_address: "",
@@ -32,65 +85,112 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
   });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setUserData(user);
-        setFormData({
-          shop_name: user.shop_name || "",
-          owner_name: user.owner_name || "",
-          shop_address: user.shop_address || "",
-          mobile_number: user.mobile_number || "",
-          email: user.email || "",
-          business_type: user.business_type || "",
-        });
-      } catch (e) {
-        console.error('Error parsing user data:', e);
-      }
+    const storedUser = localStorage.getItem("user");
+
+    if (!storedUser) {
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    try {
+      const user: UserData = JSON.parse(storedUser);
+
+      setUserData(user);
+      setFormData({
+        shop_name: user.shop_name || "",
+        owner_name: user.owner_name || "",
+        shop_address: user.shop_address || "",
+        mobile_number: user.mobile_number || "",
+        email: user.email || "",
+        business_type: user.business_type || "",
+      });
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleSave = async () => {
     if (!userData?.id) {
-      alert('Session expired. Please log in again.');
+      alert("Session expired. Please log in again.");
       return;
     }
-    setSaving(true);
-    try {
-      const response = await api.post('/update-shop-details', {
-        user_id: userData.id,
-        shop_name: formData.shop_name || null,
-        owner_name: formData.owner_name,
-        shop_address: formData.shop_address || null,
-        business_type: formData.business_type || null,
-        is_registration_complete: userData.is_registration_complete !== false,
-      });
 
-      if (response.data.success) {
-        const updatedUser = { ...response.data.data.user, email: formData.email };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
+    if (!formData.owner_name.trim()) {
+      alert("Owner name is required.");
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const payload: UpdateShopPayload = {
+        user_id: userData.id,
+        shop_name: formData.shop_name.trim() || null,
+        owner_name: formData.owner_name.trim(),
+        shop_address: formData.shop_address.trim() || null,
+        business_type: formData.business_type.trim() || null,
+        is_registration_complete: userData.is_registration_complete !== false,
+      };
+
+      const response = await api.post("/update-shop-details", payload);
+
+      if (response.data?.success) {
+        const updatedUser: UserData = {
+          ...response.data.data.user,
+          email: formData.email.trim() || null,
+        };
+
+        localStorage.setItem("user", JSON.stringify(updatedUser));
         setUserData(updatedUser);
-        alert('Settings saved successfully!');
+
+        alert("Settings saved successfully!");
+      } else {
+        alert(response.data?.message || "Failed to save settings.");
       }
-    } catch (error: any) {
-      console.error('Error saving settings:', error);
-      const msg = error.response?.data?.message || error.response?.data?.errors ? JSON.stringify(error.response.data.errors) : 'Failed to save settings. Please try again.';
-      alert(typeof msg === 'string' ? msg : 'Failed to save settings. Please try again.');
+    } catch (error: unknown) {
+      console.error("Error saving settings:", error);
+
+      if (axios.isAxiosError(error)) {
+        const apiMessage =
+          error.response?.data?.message ||
+          (error.response?.data?.errors
+            ? JSON.stringify(error.response.data.errors)
+            : null);
+
+        alert(apiMessage || "Failed to save settings. Please try again.");
+      } else {
+        alert("Failed to save settings. Please try again.");
+      }
     } finally {
       setSaving(false);
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
+    localStorage.removeItem("user");
+    localStorage.removeItem("auth_token");
+
     if (onLogout) {
       onLogout();
     } else {
-      window.location.href = '/';
+      window.location.href = "/";
     }
+  };
+
+  const toggleNotification = (key: keyof NotificationSettings) => {
+    setNotifications((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const notificationDescriptions: Record<keyof NotificationSettings, string> = {
+    lowStock: "Get notified when stock is low",
+    paymentReminder: "Reminders for pending payments",
+    newCustomer: "Notifications for new customers",
+    dailySummary: "Daily business summary",
   };
 
   if (loading) {
@@ -111,6 +211,7 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
         >
           <ArrowLeft className="w-5 h-5 text-[#111827] dark:text-white" />
         </button>
+
         <h1 className="text-lg font-bold text-[#111827] dark:text-white flex-1">
           Settings
         </h1>
@@ -120,44 +221,63 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
       <div className="flex-1 overflow-y-auto px-4 py-6 hide-scrollbar">
         {/* Profile Section */}
         <div className="mb-6">
-          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">Profile</h2>
+          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">
+            Profile
+          </h2>
+
           <div className="space-y-4">
+            {/* Shop Name */}
             <div>
               <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
                 Shop Name
               </label>
+
               <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
                 <Building2 className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <input
                   type="text"
                   value={formData.shop_name}
-                  onChange={(e) => setFormData({ ...formData, shop_name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      shop_name: e.target.value,
+                    }))
+                  }
                   placeholder="Enter shop name"
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
             </div>
 
+            {/* Owner Name */}
             <div>
               <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
                 Owner Name
               </label>
+
               <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
                 <User className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <input
                   type="text"
                   value={formData.owner_name}
-                  onChange={(e) => setFormData({ ...formData, owner_name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      owner_name: e.target.value,
+                    }))
+                  }
                   placeholder="Enter owner name"
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
             </div>
 
+            {/* Mobile */}
             <div>
               <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
                 Mobile Number
               </label>
+
               <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
                 <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <input
@@ -167,34 +287,51 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
                   className="flex-1 outline-none bg-transparent text-gray-500 dark:text-gray-400"
                 />
               </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Mobile number cannot be changed</p>
+
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Mobile number cannot be changed
+              </p>
             </div>
 
+            {/* Email */}
             <div>
               <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
                 Email (Optional)
               </label>
+
               <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <User className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      email: e.target.value,
+                    }))
+                  }
                   placeholder="Enter email address"
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
             </div>
 
+            {/* Address */}
             <div>
               <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
                 Shop Address
               </label>
+
               <div className="flex items-start gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-1" />
+                <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-1 shrink-0" />
                 <textarea
                   value={formData.shop_address}
-                  onChange={(e) => setFormData({ ...formData, shop_address: e.target.value })}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      shop_address: e.target.value,
+                    }))
+                  }
                   placeholder="Enter shop address"
                   rows={3}
                   className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none"
@@ -202,13 +339,20 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
               </div>
             </div>
 
+            {/* Business Type */}
             <div>
               <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
                 Business Type
               </label>
+
               <select
                 value={formData.business_type}
-                onChange={(e) => setFormData({ ...formData, business_type: e.target.value })}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    business_type: e.target.value,
+                  }))
+                }
                 className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
               >
                 <option value="">Select business type</option>
@@ -222,6 +366,7 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
               </select>
             </div>
 
+            {/* Save */}
             <button
               onClick={handleSave}
               disabled={saving}
@@ -242,9 +387,12 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
           </div>
         </div>
 
-        {/* Preferences Section */}
+        {/* Preferences */}
         <div className="mb-6">
-          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">Preferences</h2>
+          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">
+            Preferences
+          </h2>
+
           <div className="space-y-3">
             <div className="flex items-center justify-between p-4 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800">
               <div className="flex items-center gap-3">
@@ -253,15 +401,23 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
                 ) : (
                   <Sun className="w-5 h-5 text-[#111827] dark:text-white" />
                 )}
+
                 <div>
-                  <p className="text-sm font-medium text-[#111827] dark:text-white">Dark Mode</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Toggle dark theme</p>
+                  <p className="text-sm font-medium text-[#111827] dark:text-white">
+                    Dark Mode
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Toggle dark theme
+                  </p>
                 </div>
               </div>
+
               <button
                 onClick={toggleTheme}
                 className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isDarkMode ? "bg-[#22C55E] dark:bg-green-600" : "bg-gray-300 dark:bg-gray-600"
+                  isDarkMode
+                    ? "bg-[#22C55E] dark:bg-green-600"
+                    : "bg-gray-300 dark:bg-gray-600"
                 }`}
               >
                 <span
@@ -274,11 +430,19 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
           </div>
         </div>
 
-        {/* Notifications Section */}
+        {/* Notifications */}
         <div className="mb-6">
-          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">Notifications</h2>
+          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">
+            Notifications
+          </h2>
+
           <div className="space-y-3">
-            {Object.entries(notifications).map(([key, value]) => (
+            {(
+              Object.entries(notifications) as [
+                keyof NotificationSettings,
+                boolean,
+              ][]
+            ).map(([key, value]) => (
               <div
                 key={key}
                 className="flex items-center justify-between p-4 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
@@ -287,20 +451,22 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
                   <Bell className="w-5 h-5 text-[#111827] dark:text-white" />
                   <div>
                     <p className="text-sm font-medium text-[#111827] dark:text-white">
-                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                      {key
+                        .replace(/([A-Z])/g, " $1")
+                        .replace(/^./, (str) => str.toUpperCase())}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {key === 'lowStock' && 'Get notified when stock is low'}
-                      {key === 'paymentReminder' && 'Reminders for pending payments'}
-                      {key === 'newCustomer' && 'Notifications for new customers'}
-                      {key === 'dailySummary' && 'Daily business summary'}
+                      {notificationDescriptions[key]}
                     </p>
                   </div>
                 </div>
+
                 <button
-                  onClick={() => setNotifications({ ...notifications, [key]: !value })}
+                  onClick={() => toggleNotification(key)}
                   className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                    value ? "bg-[#22C55E] dark:bg-green-600" : "bg-gray-300 dark:bg-gray-600"
+                    value
+                      ? "bg-[#22C55E] dark:bg-green-600"
+                      : "bg-gray-300 dark:bg-gray-600"
                   }`}
                 >
                   <span
@@ -314,9 +480,12 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
           </div>
         </div>
 
-        {/* Account Actions */}
+        {/* Account */}
         <div className="mb-6">
-          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">Account</h2>
+          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">
+            Account
+          </h2>
+
           <div className="space-y-3">
             <button
               onClick={() => setShowLogoutModal(true)}
@@ -331,8 +500,12 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
             <button
               className="w-full flex items-center justify-between p-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-200"
               onClick={() => {
-                if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-                  alert('Account deletion feature coming soon');
+                if (
+                  window.confirm(
+                    "Are you sure you want to delete your account? This action cannot be undone.",
+                  )
+                ) {
+                  alert("Account deletion feature coming soon");
                 }
               }}
             >
@@ -346,19 +519,22 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
 
         {/* App Info */}
         <div className="text-center py-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400">Invocraft v1.0.0</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">© 2024 All rights reserved</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Invocraft v1.0.0
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            © {new Date().getFullYear()} All rights reserved
+          </p>
         </div>
       </div>
 
-      {/* Logout Modal */}
       {showLogoutModal && (
         <LogoutModal
+          isOpen={showLogoutModal}
           onConfirm={handleLogout}
-          onCancel={() => setShowLogoutModal(false)}
+          onClose={() => setShowLogoutModal(false)}
         />
       )}
     </div>
   );
 }
-

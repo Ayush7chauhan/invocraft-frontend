@@ -615,7 +615,7 @@ export default function AddCustomer({
                         )}
                         {party.address && (
                           <div className="flex items-start gap-2 text-sm text-[#6B7280] dark:text-gray-400 mb-2">
-                            <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
                             <span className="line-clamp-2">
                               {party.address}
                             </span>

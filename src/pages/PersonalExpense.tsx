@@ -22,9 +22,10 @@ type PersonalExpense = {
   title: string;
   category: string;
   amount: number;
+  gst_rate?: number;
   expense_date: string;
   description: string | null;
-  payment_method: string;
+  payment_method: "cash" | "upi" | "card" | "bank_transfer" | "other";
   reference_number: string | null;
   notes: string | null;
 };
@@ -194,7 +195,7 @@ export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
     setShowForm(false);
     setEditingId(null);
   };
-  const handleEdit = (expense: Expense) => {
+  const handleEdit = (expense: PersonalExpense) => {
     setFormData({
       title: expense.title ?? "",
       category: expense.category,

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../utils/api";
 
 const LOGO_SRC = "/logo.png";
+const SPLASH_DELAY = 1500;
 
 type SplashScreenProps = {
   onComplete: (redirectTo: "home" | "dashboard") => void;
@@ -9,63 +10,61 @@ type SplashScreenProps = {
 
 export default function SplashScreen({ onComplete }: SplashScreenProps) {
   const [isChecking, setIsChecking] = useState(true);
+  const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const redirectTo = (destination: "home" | "dashboard") => {
+      timeoutRef.current = window.setTimeout(() => {
+        setIsChecking(false);
+        onComplete(destination);
+      }, SPLASH_DELAY);
+    };
+
+    const clearAuth = () => {
+      localStorage.removeItem("user");
+      localStorage.removeItem("auth_token");
+    };
+
+    const handleAuthFail = () => {
+      clearAuth();
+      redirectTo("home");
+    };
+
     const checkAuth = async () => {
       try {
-        const userData = localStorage.getItem('user');
-        const token = localStorage.getItem('auth_token');
+        const userData = localStorage.getItem("user");
+        const token = localStorage.getItem("auth_token");
 
         if (!userData || !token) {
-          // No user data, go to login
-          setTimeout(() => {
-            setIsChecking(false);
-            onComplete('home');
-          }, 1500);
+          redirectTo("home");
           return;
         }
 
-        // Verify token with backend
-        try {
-          const response = await api.post('/verify-token', {
-            token: token
-          });
+        const response = await api.post("/verify-token", { token });
 
-          if (response.data.success) {
-            // Token is valid, update user data and go to dashboard
-            localStorage.setItem('user', JSON.stringify(response.data.data.user));
-            setTimeout(() => {
-              setIsChecking(false);
-              onComplete('dashboard');
-            }, 1500);
-          } else {
-            // Token invalid, clear storage and go to login
-            localStorage.removeItem('user');
-            localStorage.removeItem('auth_token');
-            setTimeout(() => {
-              setIsChecking(false);
-              onComplete('home');
-            }, 1500);
+        if (response.data?.success) {
+          const user = response.data?.data?.user;
+
+          if (user) {
+            localStorage.setItem("user", JSON.stringify(user));
           }
-        } catch (err) {
-          // Token verification failed, clear storage and go to login
-          localStorage.removeItem('user');
-          localStorage.removeItem('auth_token');
-          setTimeout(() => {
-            setIsChecking(false);
-            onComplete('home');
-          }, 1500);
+
+          redirectTo("dashboard");
+        } else {
+          handleAuthFail();
         }
-      } catch (error) {
-        // Error checking, go to login
-        setTimeout(() => {
-          setIsChecking(false);
-          onComplete('home');
-        }, 1500);
+      } catch {
+        handleAuthFail();
       }
     };
 
-    checkAuth();
+    void checkAuth();
+
+    return () => {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    };
   }, [onComplete]);
 
   return (
@@ -164,7 +163,8 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
           animation: loading-bar 1.5s ease-in-out infinite;
         }
       `}</style>
-      <div className="min-h-screen w-full bg-gradient-to-br from-[#F8F9FB] via-[#EEF5EE] to-[#F8F9FB] dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex flex-col items-center justify-center px-4 overflow-hidden">
+
+      <div className="relative min-h-screen w-full bg-[linear-gradient(to_bottom_right,#F8F9FB,#EEF5EE,#F8F9FB)] dark:bg-[linear-gradient(to_bottom_right,#111827,#111827,#1F2937)] flex flex-col items-center justify-center px-4 overflow-hidden">
         {/* Subtle background glow */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(34,197,94,0.12),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(34,197,94,0.08),transparent)] pointer-events-none" />
 
@@ -196,20 +196,22 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
             <div className="h-1 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div className="splash-loading-bar h-full bg-[#22C55E] dark:bg-green-500 rounded-full" />
             </div>
+
             <div className="flex gap-2">
               <div className="w-2 h-2 bg-[#22C55E] dark:bg-green-500 rounded-full loading-dot-1" />
               <div className="w-2 h-2 bg-[#22C55E] dark:bg-green-500 rounded-full loading-dot-2" />
               <div className="w-2 h-2 bg-[#22C55E] dark:bg-green-500 rounded-full loading-dot-3" />
             </div>
+
             <p className="text-sm text-[#718096] dark:text-gray-400 mt-0.5">
-              {isChecking ? 'Checking authentication...' : 'Loading...'}
+              {isChecking ? "Checking authentication..." : "Loading..."}
             </p>
           </div>
         </div>
 
         {/* Copyright */}
         <div className="pb-8 relative z-10">
-          <p className="splash-copyright text-xs text-[#A0AEC0] dark:text-gray-500 text-center">
+          <p className="text-xs text-[#A0AEC0] dark:text-gray-500 text-center">
             © {new Date().getFullYear()} Invocraft
           </p>
         </div>

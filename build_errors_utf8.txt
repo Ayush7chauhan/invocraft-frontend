@@ -1,0 +1,21 @@
+
+> invocraft@0.0.0 build
+> tsc -b && vite build
+
+src/components/ui/datepicker.tsx(13,83): error TS6133: 'min' is declared but its value is never read.
+src/components/ui/datepicker.tsx(13,88): error TS6133: 'max' is declared but its value is never read.
+src/pages/CreateInvoice.tsx(73,10): error TS6133: 'loading' is declared but its value is never read.
+src/pages/CreateInvoice.tsx(198,9): error TS6133: 'updateItem' is declared but its value is never read.
+src/pages/PersonalExpense.tsx(197,32): error TS2304: Cannot find name 'Expense'.
+src/pages/PersonalLedger.tsx(47,10): error TS6133: 'contactBalance' is declared but its value is never read.
+src/pages/PersonalLedger.tsx(62,10): error TS6133: 'errors' is declared but its value is never read.
+src/pages/PersonalLedger.tsx(63,10): error TS6133: 'isSubmitting' is declared but its value is never read.
+src/pages/PersonalLedger.tsx(66,9): error TS6133: 'paymentMethods' is declared but its value is never read.
+src/pages/PersonalLedger.tsx(112,9): error TS6133: 'handleSubmit' is declared but its value is never read.
+src/pages/Reports.tsx(1168,27): error TS2322: Type '(value: number | string) => string' is not assignable to type 'Formatter<string | number, NameType> & ((value: string | number, name: NameType, item: Payload<string | number, NameType>, index: number, payload: Payload<...>[]) => ReactNode | [...])'.
+  Type '(value: number | string) => string' is not assignable to type 'Formatter<string | number, NameType>'.
+    Types of parameters 'value' and 'value' are incompatible.
+      Type 'string | number | undefined' is not assignable to type 'string | number'.
+        Type 'undefined' is not assignable to type 'string | number'.
+src/pages/Settings.tsx(534,11): error TS2322: Type '{ onConfirm: () => void; onCancel: () => void; }' is not assignable to type 'IntrinsicAttributes & LogoutModalProps'.
+  Property 'onCancel' does not exist on type 'IntrinsicAttributes & LogoutModalProps'.

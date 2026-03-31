@@ -70,7 +70,7 @@ export default function CreateInvoice({
   const [parties, setParties] = useState<Party[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   // const [loading, setLoading] = useState(true);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [, setLoading] = useState<boolean>(true);
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -195,39 +195,7 @@ export default function CreateInvoice({
     setItems(items.filter((item) => item.id !== id));
   };
 
-  const updateItem = <K extends keyof InvoiceItem>(
-    id: string,
-    field: K,
-    value: InvoiceItem[K],
-  ) => {
-    setItems((prevItems) =>
-      prevItems.map((item) => {
-        if (item.id !== id) return item;
 
-        const updated: InvoiceItem = {
-          ...item,
-          [field]: value,
-        };
-
-        // If product changed, update product details
-        if (field === "product_id") {
-          const product = products.find((p) => p.id === Number(value));
-          if (product) {
-            updated.product_name = product.name;
-            updated.unit_price = product.selling_price;
-            updated.tax_rate = product.tax_rate ?? 0;
-          }
-        }
-
-        // Recalculate totals
-        updated.subtotal = updated.quantity * updated.unit_price;
-        updated.tax_amount = (updated.subtotal * updated.tax_rate) / 100;
-        updated.total = updated.subtotal + updated.tax_amount;
-
-        return updated;
-      }),
-    );
-  };
 
   const calculateTotals = () => {
     const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);

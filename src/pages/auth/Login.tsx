@@ -122,12 +122,12 @@ export default function Login() {
 
   return (
     <>
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 px-4 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-br from-green-50 via-white to-emerald-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 px-4 relative overflow-hidden">
         {/* Background glow */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(34,197,94,0.08),transparent)] dark:bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(34,197,94,0.06),transparent)] pointer-events-none" />
 
         {/* Card */}
-        <div className="login-card relative z-10 w-full max-w-sm min-h-[550px] max-h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-xl hover:shadow-2xl transition-shadow duration-300 p-6 flex flex-col justify-between border border-gray-100 dark:border-gray-700">
+        <div className="login-card relative z-10 w-full max-w-sm min-h-550px max-h-600px bg-white dark:bg-gray-800 rounded-2xl shadow-xl hover:shadow-2xl transition-shadow duration-300 p-6 flex flex-col justify-between border border-gray-100 dark:border-gray-700">
           {/* Top */}
           <div>
             {/* Logo */}
