@@ -1,3 +1,0 @@
-invocraft.run.place.test
-style WhiteBackgroundDialogTheme
-style WhiteBackgroundTheme
