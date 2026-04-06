@@ -166,23 +166,6 @@ export default function Home({ onSubmit }: HomeProps) {
           )}
         </button>
 
-        {import.meta.env.DEV && (
-          <button
-            className="w-full mt-4 font-semibold py-3 rounded-xl flex items-center justify-center gap-2 bg-yellow-400 text-yellow-900 hover:bg-yellow-500 transition shadow-sm"
-            onClick={handleDevLogin}
-            disabled={isDevLoggingIn}
-          >
-            {isDevLoggingIn ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Logging in...
-              </>
-            ) : (
-              <>🚀 [DEV] Fast Auto-Login</>
-            )}
-          </button>
-        )}
-
         <div className="flex items-center gap-2 mt-8 text-[#16A34A] dark:text-green-400">
           <ShieldCheck className="w-5 h-5" />
           <span className="text-sm text-[#374151] dark:text-gray-300">
