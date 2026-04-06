@@ -520,7 +520,7 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
         {/* App Info */}
         <div className="text-center py-4">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Invocraft v1.0.0
+            Invocraft v{import.meta.env.VITE_APP_VERSION}
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
             © {new Date().getFullYear()} All rights reserved

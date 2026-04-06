@@ -26,16 +26,16 @@ export default function Home({ onSubmit }: HomeProps) {
   const handleDevLogin = async () => {
     setIsDevLoggingIn(true);
     try {
-      const response = await api.post('/dev/auto-login');
+      const response = await api.post("/dev/auto-login");
       if (response.data.success) {
         const user = response.data.data.user;
         const token = response.data.data.token;
-        
-        localStorage.setItem('temp_user', JSON.stringify(user));
-        localStorage.setItem('temp_mobile', user.mobile_number);
-        localStorage.setItem('auth_token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        
+
+        localStorage.setItem("temp_user", JSON.stringify(user));
+        localStorage.setItem("temp_mobile", user.mobile_number);
+        localStorage.setItem("auth_token", token);
+        localStorage.setItem("user", JSON.stringify(user));
+
         window.location.reload();
       }
     } catch (err) {
@@ -178,9 +178,7 @@ export default function Home({ onSubmit }: HomeProps) {
                 Logging in...
               </>
             ) : (
-              <>
-                🚀 [DEV] Fast Auto-Login
-              </>
+              <>🚀 [DEV] Fast Auto-Login</>
             )}
           </button>
         )}
