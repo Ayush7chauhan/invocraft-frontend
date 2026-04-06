@@ -19,32 +19,8 @@ type HomeProps = {
 export default function Home({ onSubmit }: HomeProps) {
   const [mobile, setMobile] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isDevLoggingIn, setIsDevLoggingIn] = useState(false);
   const [error, setError] = useState("");
   const isValidMobile = useMemo(() => /^[6-9]\d{9}$/.test(mobile), [mobile]);
-
-  const handleDevLogin = async () => {
-    setIsDevLoggingIn(true);
-    try {
-      const response = await api.post("/dev/auto-login");
-      if (response.data.success) {
-        const user = response.data.data.user;
-        const token = response.data.data.token;
-
-        localStorage.setItem("temp_user", JSON.stringify(user));
-        localStorage.setItem("temp_mobile", user.mobile_number);
-        localStorage.setItem("auth_token", token);
-        localStorage.setItem("user", JSON.stringify(user));
-
-        window.location.reload();
-      }
-    } catch (err) {
-      setError("Dev login failed. Check backend seeders.");
-      console.error(err);
-    } finally {
-      setIsDevLoggingIn(false);
-    }
-  };
 
   const handleSubmit = async () => {
     if (!isValidMobile) return;
