@@ -8,8 +8,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import LOGO from "../../assets/LOGO.png";
+
 // Use logo from public so replacing public/logo.png updates login + favicon
-const LOGO_SRC = "/logo.png";
+// const LOGO_SRC = "/logo.png";
 
 export default function Login() {
   const [mobile, setMobile] = useState("");
@@ -134,7 +136,7 @@ export default function Login() {
             <div className="flex justify-center mb-4">
               <div className="login-logo-wrap rounded-2xl p-1">
                 <img
-                  src={LOGO_SRC}
+                  src={LOGO}
                   alt="Invocraft Logo"
                   className="login-logo login-logo-float h-20 w-20 rounded-2xl object-contain drop-shadow-lg"
                 />
