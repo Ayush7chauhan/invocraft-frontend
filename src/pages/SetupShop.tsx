@@ -15,11 +15,8 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import api from "../utils/api";
-
-type SetupShopProps = {
-  mobile: string;
-  onContinue: () => void;
-};
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 type BusinessType = "grocery" | "medical" | "general" | "other";
 
@@ -36,7 +33,12 @@ type UpdateShopPayload = {
   business_type?: BusinessType;
 };
 
-export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
+
+export default function SetupShop() {
+  const { updateUser } = useAuth();
+  const navigate = useNavigate();
+  const mobile = localStorage.getItem("temp_mobile") || "";
+
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [shopAddress, setShopAddress] = useState("");
@@ -150,8 +152,10 @@ export default function SetupShop({ mobile, onContinue }: SetupShopProps) {
         localStorage.removeItem("temp_user");
         localStorage.removeItem("temp_mobile");
 
+        updateUser(response.data.data.user);
+
         successTimeoutRef.current = window.setTimeout(() => {
-          onContinue();
+          navigate("/dashboard");
         }, 1500);
       } else {
         setErrors({

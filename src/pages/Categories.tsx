@@ -7,6 +7,7 @@ import {
   Loader2,
   Trash2,
   CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import api from "../utils/api";
 
@@ -15,15 +16,16 @@ type Category = {
   name: string;
 };
 
-type CategoriesProps = {
-  onBack: () => void;
-  initialShowForm?: boolean;
-};
+import { useNavigate, useLocation } from "react-router-dom";
 
-export default function Categories({
-  onBack,
-  initialShowForm = false,
-}: CategoriesProps) {
+export default function Categories() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const onBack = () => navigate(-1);
+  
+  const state = location.state as { initialShowForm?: boolean } | null;
+  const initialShowForm = state?.initialShowForm || false;
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(!!initialShowForm);
@@ -57,11 +59,16 @@ export default function Categories({
   };
 
   const handleConfirmAdd = () => {
-    const name = newName.trim();
+    const name = newName.trim().replace(/\s+/g, " ");
     if (!name) {
-      setError("Category name is required");
+      setError("Category name is required.");
       return;
     }
+    if (name.length > 50) {
+      setError("Category name must be under 50 characters.");
+      return;
+    }
+    setNewName(name);
     setShowConfirm(true);
   };
 
@@ -166,9 +173,10 @@ export default function Categories({
                 } bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
               />
               {error && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  {error}
-                </p>
+                <div className="mt-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl p-3 flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-xs">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
               )}
             </div>
             <button

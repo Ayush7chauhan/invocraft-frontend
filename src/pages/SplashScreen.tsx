@@ -1,28 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../utils/api";
 
+import { useNavigate } from "react-router-dom";
+
 const LOGO_SRC = "/logo.png";
 const SPLASH_DELAY = 1500;
 
-type SplashScreenProps = {
-  onComplete: (redirectTo: "home" | "dashboard") => void;
-};
-
-export default function SplashScreen({ onComplete }: SplashScreenProps) {
+export default function SplashScreen() {
+  const navigate = useNavigate();
   const [isChecking, setIsChecking] = useState(true);
+
   const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const redirectTo = (destination: "home" | "dashboard") => {
       timeoutRef.current = window.setTimeout(() => {
         setIsChecking(false);
-        onComplete(destination);
+        navigate(destination === "dashboard" ? "/dashboard" : "/login");
       }, SPLASH_DELAY);
     };
 
     const clearAuth = () => {
       localStorage.removeItem("user");
-      localStorage.removeItem("auth_token");
+      localStorage.removeItem("token");
     };
 
     const handleAuthFail = () => {
@@ -33,7 +33,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
     const checkAuth = async () => {
       try {
         const userData = localStorage.getItem("user");
-        const token = localStorage.getItem("auth_token");
+        const token = localStorage.getItem("token");
 
         if (!userData || !token) {
           redirectTo("home");
@@ -65,7 +65,7 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
         window.clearTimeout(timeoutRef.current);
       }
     };
-  }, [onComplete]);
+  }, [navigate]);
 
   return (
     <>

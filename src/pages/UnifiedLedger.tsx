@@ -12,6 +12,7 @@ import {
   Trash2,
   X,
   User,
+  AlertCircle,
 } from "lucide-react";
 import axios from "axios";
 import api from "../utils/api";
@@ -44,12 +45,7 @@ type Transaction = {
   };
 };
 
-type UnifiedLedgerProps = {
-  contactId: number;
-  contactName: string;
-  contactType: ContactType;
-  onBack: () => void;
-};
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 
 type BalanceState = {
   balance: number;
@@ -69,12 +65,19 @@ type FormState = {
 
 const getTodayDate = () => new Date().toISOString().split("T")[0];
 
-export default function UnifiedLedger({
-  contactId,
-  contactName,
-  contactType,
-  onBack,
-}: UnifiedLedgerProps) {
+export default function UnifiedLedger() {
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const state = location.state as { contactName?: string; contactType?: ContactType } | null;
+  
+  const contactId = Number(id);
+  const contactName = state?.contactName || "Ledger";
+  const contactType = state?.contactType || "business";
+  
+  const onBack = () => navigate(-1);
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -599,11 +602,17 @@ export default function UnifiedLedger({
               </div>
             </div>
 
-            {errors.submit && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.submit}
-                </p>
+            {Object.keys(errors).length > 0 && (
+              <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 flex flex-col gap-2 mt-4">
+                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-sm">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Please fix the following errors:</span>
+                </div>
+                <ul className="text-xs text-rose-600 dark:text-rose-400 font-medium list-disc pl-5">
+                  {Object.values(errors).map((err, i) => (
+                    <li key={i}>{err}</li>
+                  ))}
+                </ul>
               </div>
             )}
 

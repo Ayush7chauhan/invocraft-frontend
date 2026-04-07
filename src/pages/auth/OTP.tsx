@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Zap, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import axios from "axios";
 import api from "../../utils/api";
 
-type OTPProps = {
-  mobile: string;
-  onBack: () => void;
-  onVerify: (requiresRegistration: boolean) => void;
-};
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
-export default function OTP({ mobile, onBack, onVerify }: OTPProps) {
+export default function OTP() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const mobile = localStorage.getItem("temp_mobile") || "";
+  
+  const onBack = () => navigate("/login");
+
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
   const [isLoading, setIsLoading] = useState(false);
@@ -70,9 +73,11 @@ export default function OTP({ mobile, onBack, onVerify }: OTPProps) {
         }
 
         if (user.is_registration_complete && token) {
-          onVerify(false);
+          login({ ...user, is_setup_complete: true }, token);
+          navigate("/dashboard");
         } else {
-          onVerify(true);
+          login({ ...user, is_setup_complete: false }, token);
+          navigate("/setup");
         }
       } else {
         setError(response.data.message || "Invalid OTP");
@@ -251,7 +256,7 @@ export default function OTP({ mobile, onBack, onVerify }: OTPProps) {
 
       <div className="py-8 flex flex-col items-center text-center">
         <div className="w-10 h-10 bg-[#22C55E] dark:bg-green-600 rounded-xl flex items-center justify-center mb-2">
-          <Zap className="w-5 h-5 text-white" />
+          <img src="/logo.png" alt="Invocraft Logo" className="w-full h-full" />
         </div>
 
         <p className="text-sm font-semibold text-[#111827] dark:text-white">

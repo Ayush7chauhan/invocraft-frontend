@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../utils/api";
+import axios from "axios";
 import {
-  Zap,
   Send,
   ShieldCheck,
   Clock,
@@ -9,17 +11,14 @@ import {
   CircleAlert,
   Loader2,
 } from "lucide-react";
-import api from "../utils/api";
-import axios from "axios";
 
-type HomeProps = {
-  onSubmit: (mobile: string) => void;
-};
-
-export default function Home({ onSubmit }: HomeProps) {
+export default function Home() {
   const [mobile, setMobile] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
+
+
   const isValidMobile = useMemo(() => /^[6-9]\d{9}$/.test(mobile), [mobile]);
 
   const handleSubmit = async () => {
@@ -43,7 +42,7 @@ export default function Home({ onSubmit }: HomeProps) {
 
       if (response.data.success) {
         localStorage.setItem("temp_mobile", mobile);
-        onSubmit(mobile);
+        navigate("/otp");
       } else {
         setError(response.data.message || "Failed to send OTP");
       }
@@ -68,8 +67,8 @@ export default function Home({ onSubmit }: HomeProps) {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm flex flex-col items-center text-center">
-        <div className="w-16 h-16 bg-[#22C55E] dark:bg-green-600 rounded-2xl shadow-md flex items-center justify-center mb-4">
-          <Zap className="w-7 h-7 text-white" />
+        <div className="w-20 h-20 bg-[#22C55E] dark:bg-green-600 rounded-2xl shadow-md flex items-center justify-center mb-4">
+          <img src="/logo.png" alt="Invocraft Logo" className="w-full h-full" />
         </div>
 
         <h1 className="text-xl font-bold text-[#1F2937] dark:text-white mb-6">

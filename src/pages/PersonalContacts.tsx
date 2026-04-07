@@ -32,15 +32,20 @@ type PersonalContact = {
   they_owe?: number;
 };
 
-type PersonalContactsProps = {
-  onBack: () => void;
-  onViewLedger?: (contactId: number, contactName: string) => void;
-};
+import { useNavigate } from "react-router-dom";
 
-export default function PersonalContacts({
-  onBack,
-  onViewLedger,
-}: PersonalContactsProps) {
+export default function PersonalContacts() {
+  const navigate = useNavigate();
+  const onBack = () => navigate(-1);
+  const onViewLedger = (contactId: number, contactName: string) => {
+    navigate(`/ledger/${contactId}`, { 
+      state: { 
+        contactName, 
+        contactType: "personal" 
+      } 
+    });
+  };
+
   const [showForm, setShowForm] = useState(false);
   const [contacts, setContacts] = useState<PersonalContact[]>([]);
   const [loading, setLoading] = useState(true);

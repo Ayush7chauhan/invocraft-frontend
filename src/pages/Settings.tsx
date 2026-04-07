@@ -19,10 +19,8 @@ import { useTheme } from "../hooks/useTheme";
 import api from "../utils/api";
 import LogoutModal from "../components/LogoutModal";
 
-type SettingsProps = {
-  onBack: () => void;
-  onLogout?: () => void;
-};
+import { useNavigate } from "react-router-dom";
+
 
 type UserData = {
   id: number;
@@ -60,7 +58,10 @@ type UpdateShopPayload = {
   is_registration_complete: boolean;
 };
 
-export default function Settings({ onBack, onLogout }: SettingsProps) {
+export default function Settings() {
+  const navigate = useNavigate();
+  const onBack = () => navigate(-1);
+
   const { isDarkMode, toggleTheme } = useTheme();
 
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -170,13 +171,8 @@ export default function Settings({ onBack, onLogout }: SettingsProps) {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    localStorage.removeItem("auth_token");
-
-    if (onLogout) {
-      onLogout();
-    } else {
-      window.location.href = "/";
-    }
+    localStorage.removeItem("token");
+    navigate("/login");
   };
 
   const toggleNotification = (key: keyof NotificationSettings) => {

@@ -30,11 +30,12 @@ type PersonalExpense = {
   notes: string | null;
 };
 
-type PersonalExpenseProps = {
-  onBack: () => void;
-};
+import { useNavigate } from "react-router-dom";
 
-export default function PersonalExpense({ onBack }: PersonalExpenseProps) {
+export default function PersonalExpense() {
+  const navigate = useNavigate();
+  const onBack = () => navigate(-1);
+
   const [showForm, setShowForm] = useState(false);
   const [expenses, setExpenses] = useState<PersonalExpense[]>([]);
   const [loading, setLoading] = useState(true);

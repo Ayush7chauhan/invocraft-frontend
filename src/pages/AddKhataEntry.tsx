@@ -31,11 +31,12 @@ type Transaction = {
   party?: Party;
 };
 
-type AddKhataEntryProps = {
-  onBack: () => void;
-};
+import { useNavigate } from "react-router-dom";
 
-export default function AddKhataEntry({ onBack }: AddKhataEntryProps) {
+export default function AddKhataEntry() {
+  const navigate = useNavigate();
+  const onBack = () => navigate(-1);
+
   const [showForm, setShowForm] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [parties, setParties] = useState<Party[]>([]);

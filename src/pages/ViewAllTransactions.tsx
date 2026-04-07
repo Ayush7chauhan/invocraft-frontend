@@ -23,11 +23,12 @@ type Transaction = {
   personal_contact?: { name: string };
 };
 
-type Props = {
-  onBack: () => void;
-};
+import { useNavigate } from "react-router-dom";
 
-export default function ViewAllTransactions({ onBack }: Props) {
+export default function ViewAllTransactions() {
+  const navigate = useNavigate();
+  const onBack = () => navigate(-1);
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
