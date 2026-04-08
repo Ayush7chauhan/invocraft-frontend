@@ -1,4 +1,5 @@
 import { AlertTriangle, X } from "lucide-react";
+import Button from "./ui/Button";
 
 type DeleteConfirmModalProps = {
   isOpen: boolean;
@@ -11,6 +12,7 @@ type DeleteConfirmModalProps = {
   invoiceCount?: number;
   paymentCount?: number;
   checkingRelations?: boolean;
+  isLoading?: boolean;
 };
 
 export default function DeleteConfirmModal({
@@ -24,23 +26,23 @@ export default function DeleteConfirmModal({
   invoiceCount = 0,
   paymentCount = 0,
   checkingRelations = false,
+  isLoading = false,
 }: DeleteConfirmModalProps) {
   if (!isOpen) return null;
 
   const handleConfirm = () => {
     onConfirm();
-    onClose();
+    // Replaced onClose() so the modal doesn't immediately close right when we trigger an async API call if we want to show loading
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      onClick={!isLoading ? onClose : undefined}
     >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
       />
 
       {/* Modal */}
@@ -49,12 +51,14 @@ export default function DeleteConfirmModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-        >
-          <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-        </button>
+        {!isLoading && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+          </button>
+        )}
 
         {/* Warning Icon */}
         <div className="flex justify-center mb-4">
@@ -117,21 +121,25 @@ export default function DeleteConfirmModal({
 
         {/* Buttons */}
         <div className="flex gap-3">
-          <button
+          <Button
+            variant="secondary"
             onClick={onClose}
-            className="flex-1 py-3 px-4 rounded-xl bg-gray-100 dark:bg-gray-700 text-[#374151] dark:text-gray-300 font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 active:scale-95"
+            disabled={isLoading || checkingRelations}
+            className="flex-1"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="danger"
             onClick={handleConfirm}
-            className="flex-1 py-3 px-4 rounded-xl bg-red-600 dark:bg-red-700 text-white font-semibold hover:bg-red-700 dark:hover:bg-red-800 transition-all duration-200 active:scale-95 shadow-lg hover:shadow-xl"
+            isLoading={isLoading}
+            disabled={checkingRelations}
+            className="flex-1"
           >
             Delete
-          </button>
+          </Button>
         </div>
       </div>
-
     </div>
   );
 }

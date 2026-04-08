@@ -1,5 +1,4 @@
-import React from "react";
-import { ArrowLeft, Download } from "lucide-react";
+import { X, Download, FileText, Calendar, User, MapPin, Phone } from "lucide-react";
 import Button from "../ui/Button";
 
 interface InvoicePreviewProps {
@@ -10,7 +9,7 @@ interface InvoicePreviewProps {
   formData: any;
   selectedParty: any;
   items: any[];
-  totals: any;
+  totals: { subtotal: number; totalTax: number; total: number };
   formatAmount: (amount: number) => string;
   formatDate: (date: string) => string;
   pdfRef: React.RefObject<HTMLDivElement | null>;
@@ -30,195 +29,177 @@ const InvoicePreview: React.FC<InvoicePreviewProps> = ({
   pdfRef,
 }) => {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-900 animate-in fade-in slide-in-from-right-4 duration-300">
-      {/* Header */}
-      <div className="px-4 py-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-2xl">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h2 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">Preview Invoice</h2>
+    <div className="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-950 animate-in fade-in duration-300">
+      <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md sticky top-0 z-10">
+        <button onClick={onBack} className="w-10 h-10 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-900 dark:text-white transition-all active:scale-95">
+          <X className="w-5 h-5" />
+        </button>
+        <div className="text-center">
+          <h2 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">Invoice Preview</h2>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{formData.invoiceNumber}</p>
         </div>
         <Button 
-          variant="secondary" 
           size="sm" 
           onClick={onDownload} 
           isLoading={isGeneratingPDF}
-          className="rounded-2xl bg-green-500/10 text-green-600 border-none px-6"
+          className="h-10 rounded-xl bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 px-4"
         >
-          <Download className="w-4 h-4 mr-2" /> 
-          <span className="text-[10px] font-black uppercase tracking-widest">Save PDF</span>
+          <Download className="w-4 h-4 mr-2" />
+          <span className="text-[10px] font-black uppercase tracking-widest">Download</span>
         </Button>
       </div>
 
-      {/* Preview Content */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-gray-50 dark:bg-gray-950 custom-scrollbar">
-        <div className="max-w-3xl mx-auto bg-white dark:bg-gray-900 rounded-[32px] shadow-2xl border border-gray-100 dark:border-gray-800 p-8 sm:p-12 space-y-10">
+      <div className="flex-1 overflow-y-auto p-6 md:p-12 bg-gray-50/50 dark:bg-gray-950/50 flex justify-center custom-scrollbar">
+        <div className="w-full max-w-4xl bg-white dark:bg-gray-900 shadow-2xl rounded-[40px] overflow-hidden border border-gray-100 dark:border-gray-800 p-10 md:p-16 space-y-12 animate-in zoom-in-95 duration-500" ref={pdfRef}>
           
-          {/* Shop & Invoice Info */}
-          <div className="flex flex-col sm:flex-row justify-between gap-8 border-b-2 border-gray-50 dark:border-gray-800 pb-8">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{userData.shop_name || "My Shop"}</h1>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest leading-relaxed max-w-xs">{userData.shop_address}</p>
-              <p className="text-xs font-bold text-gray-400">Phone: {userData.mobile_number}</p>
+          <div className="flex flex-col md:flex-row justify-between gap-10 border-b-4 border-emerald-500 pb-12">
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-[24px] bg-emerald-500 flex items-center justify-center text-white shadow-xl shadow-emerald-500/20">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tight">{userData.shop_name || "BUSINESS NAME"}</h1>
+                  <p className="text-[11px] font-black text-emerald-500 uppercase tracking-[0.3em] mt-1">Official Tax Invoice</p>
+                </div>
+              </div>
+              <div className="space-y-1 pl-1">
+                <p className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-emerald-500" /> {userData.shop_address || "Shop Address Not Fixed"}</p>
+                <p className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-emerald-500" /> {userData.mobile_number || "91 XXXXX XXXXX"}</p>
+                {userData.email && <p className="text-xs font-bold text-gray-500 uppercase truncate">Email: {userData.email}</p>}
+              </div>
             </div>
-            <div className="sm:text-right space-y-2">
-              <h2 className="text-3xl font-black text-green-500 uppercase tracking-tighter">INVOICE</h2>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Invoice Number</p>
-                <p className="text-sm font-black text-gray-900 dark:text-white"># {formData.invoice_number}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</p>
-                <p className="text-sm font-black text-gray-900 dark:text-white">{formatDate(formData.invoice_date)}</p>
-              </div>
+
+            <div className="bg-gray-50 dark:bg-gray-800/50 p-8 rounded-[32px] border-2 border-gray-100 dark:border-gray-800 flex flex-col justify-center text-right space-y-1 min-w-[200px]">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-2">Invoice Details</p>
+              <h2 className="text-xl font-black text-gray-900 dark:text-white">#{formData.invoiceNumber}</h2>
+              <p className="text-sm font-bold text-emerald-600">{formatDate(formData.invoiceDate)}</p>
+              <Badge variant={formData.paymentStatus === 'paid' ? 'success' : 'warning'} className="mt-2 self-end uppercase text-[8px] tracking-[0.2em] px-3 py-1 bg-white dark:bg-gray-900 font-black">
+                {formData.paymentStatus.replace('_', ' ')}
+              </Badge>
             </div>
           </div>
 
-          {/* Customer Info */}
-          <div className="grid grid-cols-2 gap-8">
-            <div className="space-y-2">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bill To</p>
-              <p className="text-sm font-black text-gray-900 dark:text-white">{selectedParty?.name}</p>
-              <p className="text-xs font-bold text-gray-500">{selectedParty?.mobile}</p>
-              <p className="text-xs font-bold text-gray-500 leading-relaxed max-w-[200px]">{selectedParty?.address}</p>
-            </div>
-          </div>
-
-          {/* Items Table */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-12 gap-4 px-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 dark:border-gray-800 pb-2">
-              <span className="col-span-6">Item Description</span>
-              <span className="col-span-2 text-center">Qty</span>
-              <span className="col-span-2 text-right">Price</span>
-              <span className="col-span-2 text-right">Total</span>
-            </div>
-            <div className="space-y-4">
-              {items.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-4 px-2 items-center">
-                  <div className="col-span-6 min-w-0">
-                    <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{item.product_name}</p>
-                    {item.tax_rate > 0 && <p className="text-[9px] font-bold text-blue-500 uppercase">Tax: {item.tax_rate}%</p>}
+          <div className="grid md:grid-cols-2 gap-12 pt-4">
+             <div className="space-y-4">
+                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] flex items-center gap-2">
+                  <User className="w-3.5 h-3.5" /> Billed To
+                </p>
+                {selectedParty ? (
+                  <div className="space-y-1 bg-gray-50 dark:bg-gray-800/50 p-6 rounded-[28px] border-2 border-gray-100 dark:border-gray-800">
+                    <p className="text-lg font-black text-gray-900 dark:text-white uppercase">{selectedParty.name}</p>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase flex items-center gap-2"><Phone className="w-3 h-3" /> {selectedParty.mobile || "N/A"}</p>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase flex items-center gap-2 leading-relaxed"><MapPin className="w-3 h-3 shrink-0" /> {selectedParty.address || "No Address Provided"}</p>
                   </div>
-                  <span className="col-span-2 text-sm font-bold text-gray-600 text-center">{item.quantity}</span>
-                  <span className="col-span-2 text-sm font-bold text-gray-600 text-right">{formatAmount(item.unit_price)}</span>
-                  <span className="col-span-2 text-sm font-black text-gray-900 dark:text-white text-right">{formatAmount(item.total)}</span>
+                ) : (
+                  <p className="text-sm italic text-gray-400">Walking Customer / Not Selected</p>
+                )}
+             </div>
+             
+             <div className="space-y-4 md:text-right">
+                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] flex md:justify-end items-center gap-2">
+                  <Calendar className="w-3.5 h-3.5" /> Payment Method
+                </p>
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-[28px] border-2 border-gray-100 dark:border-gray-800 inline-block md:ml-auto">
+                    <p className="text-lg font-black text-gray-900 dark:text-white uppercase">CASH / UPI</p>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase mt-1">Settled on checkout</p>
                 </div>
-              ))}
+             </div>
+          </div>
+
+          <div className="space-y-6 pt-4">
+            <div className="overflow-x-auto pb-4 custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[600px]">
+                <thead>
+                  <tr className="border-b-2 border-gray-100 dark:border-gray-800">
+                    <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">#</th>
+                    <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item Description</th>
+                    <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
+                    <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Unit Price</th>
+                    <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Tax (%)</th>
+                    <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right pr-2">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                  {items.map((item, idx) => {
+                    const quantity = Number(item.quantity) || 0;
+                    const unitPrice = Number(item.unitPrice) || 0;
+                    const taxRate = Number(item.taxRate) || 0;
+                    const total = (quantity * unitPrice) + ((quantity * unitPrice * taxRate) / 100);
+                    
+                    return (
+                      <tr key={idx} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
+                        <td className="py-5 text-sm font-black text-gray-300 dark:text-gray-700 pl-2">{String(idx + 1).padStart(2, '0')}</td>
+                        <td className="py-5">
+                          <p className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">{item.name}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Standard Supply</p>
+                        </td>
+                        <td className="py-5 text-sm font-black text-gray-900 dark:text-white text-center tabular-nums">{quantity}</td>
+                        <td className="py-5 text-sm font-bold text-gray-600 dark:text-gray-400 text-right tabular-nums">{formatAmount(unitPrice)}</td>
+                        <td className="py-5 text-sm font-bold text-blue-500 text-right tabular-nums">{taxRate}%</td>
+                        <td className="py-5 text-base font-black text-gray-900 dark:text-white text-right tabular-nums pr-2">{formatAmount(total)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-start pt-8 border-t-2 border-gray-100 dark:border-gray-800 gap-10">
+               <div className="max-w-[300px] space-y-3">
+                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em]">Terms & Notes</p>
+                  <p className="text-xs font-bold text-gray-400 uppercase leading-relaxed">
+                    {formData.notes || "Goods once sold will not be taken back. E & O.E. Standard business terms apply."}
+                  </p>
+               </div>
+
+               <div className="w-full md:w-[350px] space-y-4 bg-gray-50 dark:bg-gray-800/30 p-8 rounded-[32px] border-2 border-gray-100 dark:border-gray-800">
+                  <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    <span>Subtotal</span>
+                    <span className="text-gray-900 dark:text-white">{formatAmount(totals.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    <span>Sales Tax Total</span>
+                    <span className="text-blue-500 font-black">{formatAmount(totals.totalTax)}</span>
+                  </div>
+                  <div className="pt-4 border-t-2 border-dashed border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <span className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">Grand Total</span>
+                    <span className="text-3xl font-black text-emerald-500 tracking-tighter tabular-nums drop-shadow-sm">{formatAmount(totals.total)}</span>
+                  </div>
+                  
+                  {Number(formData.paidAmount) > 0 && (
+                    <div className="pt-2 flex justify-between items-center text-[10px] font-black text-orange-500 uppercase tracking-widest">
+                      <span>Total Paid</span>
+                      <span>-{formatAmount(Number(formData.paidAmount))}</span>
+                    </div>
+                  )}
+               </div>
             </div>
           </div>
 
-          {/* Totals Section */}
-          <div className="flex justify-end pt-8 border-t-2 border-gray-50 dark:border-gray-800">
-            <div className="w-full max-w-[250px] space-y-3">
-              <div className="flex justify-between items-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                <span>Subtotal</span>
-                <span>{formatAmount(totals.subtotal)}</span>
-              </div>
-              {totals.totalTax > 0 && (
-                <div className="flex justify-between items-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                  <span>Total Tax</span>
-                  <span>{formatAmount(totals.totalTax)}</span>
-                </div>
-              )}
-              <div className="flex justify-between items-center pt-3 border-t border-gray-100 dark:border-gray-800">
-                <span className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">Grand Total</span>
-                <span className="text-2xl font-black text-green-500 tracking-tighter">{formatAmount(totals.total)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          {(formData.notes || formData.terms) && (
-            <div className="space-y-4 pt-8 border-t border-gray-50 dark:border-gray-800">
-              {formData.notes && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Notes</p>
-                  <p className="text-xs font-bold text-gray-500 italic">"{formData.notes}"</p>
-                </div>
-              )}
-              {formData.terms && (
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Terms & Conditions</p>
-                  <p className="text-xs font-bold text-gray-500 leading-relaxed">{formData.terms}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Thank you footer */}
-          <div className="text-center pt-12">
-            <p className="text-[10px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-[0.2em] mb-4">Generated via InvoCraft</p>
-            <p className="text-xs font-bold text-green-500/50 uppercase tracking-widest">Thank you for your business!</p>
+          <div className="pt-12 text-center border-t border-gray-100 dark:border-gray-800">
+             <div className="inline-block p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl">
+                <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.4em]">This is a computer generated invoice</p>
+             </div>
           </div>
         </div>
       </div>
-
-      {/* Hidden real PDF generation container - Uses standard tailwind-compatible styles for html2canvas */}
-      <div ref={pdfRef} className="absolute left-[-9999px] top-0 w-[210mm] p-10 bg-white text-gray-900 font-sans">
-        {/* Same content as above but optimized for PDF dimensions */}
-         <div className="border-b-2 border-gray-200 pb-6 mb-6 flex justify-between items-start">
-            <div>
-              <h1 className="text-2xl font-black uppercase tracking-tight">{userData.shop_name || "My Shop"}</h1>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">{userData.shop_address}</p>
-              <p className="text-xs font-bold text-gray-500 mt-1">Phone: {userData.mobile_number}</p>
-            </div>
-            <div className="text-right">
-              <h2 className="text-2xl font-black text-green-500 uppercase">INVOICE</h2>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1"># {formData.invoice_number}</p>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">{formatDate(formData.invoice_date)}</p>
-            </div>
-          </div>
-          {/* ... Rest of the PDF content similar to above hidden container in Bills.tsx ... */}
-          <div className="mb-6">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Bill To</p>
-            <p className="text-sm font-black">{selectedParty?.name}</p>
-            <p className="text-xs font-bold text-gray-500">{selectedParty?.mobile}</p>
-            <p className="text-xs font-bold text-gray-500">{selectedParty?.address}</p>
-          </div>
-          <table className="w-full border-collapse mb-6">
-            <thead>
-              <tr className="border-b-2 border-gray-100">
-                <th className="text-left py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item Description</th>
-                <th className="text-right py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Qty</th>
-                <th className="text-right py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Price</th>
-                <th className="text-right py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, idx) => (
-                <tr key={idx} className="border-b border-gray-50">
-                  <td className="py-4 text-xs font-bold">{item.product_name}</td>
-                  <td className="text-right py-4 text-xs font-bold">{item.quantity}</td>
-                  <td className="text-right py-4 text-xs font-bold">{formatAmount(item.unit_price)}</td>
-                  <td className="text-right py-4 text-xs font-black">{formatAmount(item.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="flex justify-end">
-            <div className="w-48 space-y-2">
-              <div className="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
-                <span>Subtotal</span>
-                <span>{formatAmount(totals.subtotal)}</span>
-              </div>
-              {totals.totalTax > 0 && (
-                <div className="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
-                  <span>Tax Total</span>
-                  <span>{formatAmount(totals.totalTax)}</span>
-                </div>
-              )}
-              <div className="flex justify-between py-2 border-t border-gray-100">
-                <span className="text-xs font-black uppercase tracking-widest">Grand Total</span>
-                <span className="text-sm font-black text-green-500">{formatAmount(totals.total)}</span>
-              </div>
-            </div>
-          </div>
-          <div className="mt-20 pt-6 border-t border-gray-100 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
-            Generated via InvoCraft. Thank you for your business!
-          </div>
-      </div>
     </div>
+  );
+};
+
+// Re-defining Badge for modularity inside preview
+const Badge = ({ children, variant, className = "" }: { children: React.ReactNode; variant: 'success' | 'warning' | 'error' | 'neutral'; className?: string }) => {
+  const styles = {
+    success: "bg-emerald-500 text-white border-emerald-500 shadow-emerald-500/10",
+    warning: "bg-orange-500 text-white border-orange-500 shadow-orange-500/10",
+    error: "bg-rose-500 text-white border-rose-500 shadow-rose-500/10",
+    neutral: "bg-gray-500 text-white border-gray-500 shadow-gray-500/10",
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded-lg border font-black shadow-sm ${styles[variant]} ${className}`}>
+      {children}
+    </span>
   );
 };
 

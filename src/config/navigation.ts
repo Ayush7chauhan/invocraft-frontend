@@ -14,6 +14,7 @@ import {
   FolderOpen,
   Receipt,
   FilePlus,
+  Settings as SettingsIcon,
   type LucideIcon
 } from "lucide-react";
 
@@ -70,5 +71,10 @@ export const NAVIGATION_CONFIG: NavItem[] = [
       { title: "Bills & Invoices", href: "/bills", icon: Receipt },
       { title: "Create Invoice", href: "/bills/create", icon: FilePlus },
     ],
+  },
+  {
+    title: "Settings",
+    href: "/settings",
+    icon: SettingsIcon,
   },
 ];

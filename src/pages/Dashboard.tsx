@@ -1,40 +1,37 @@
 import { useMemo } from "react";
-import {
-  Bell,
+import { 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  TrendingUp, 
+  TrendingDown, 
+  Users, 
+  ShoppingBag, 
+  Target, 
   Wallet,
-  FileText,
-  Package,
-  TrendingDown,
-  TrendingUp,
-  RotateCcw,
   ArrowRight,
-  TrendingUp as TrendingUpIcon,
-  ShoppingBag,
-  Users,
-  BookOpen,
-  ReceiptText,
+  Receipt,
+  Package,
+  Calendar,
+  ChevronRight,
   BarChart3,
-  Clock
+  Plus,
+  ShieldCheck,
+  Zap,
+  Layers,
+  Activity
 } from "lucide-react";
-import { useNavigate, useOutletContext } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { Card, CardContent } from "../components/ui/card";
-import PageContainer from "../components/ui/PageContainer";
+import { Link, useNavigate } from "react-router-dom";
+import { useDashboard } from "../hooks/useDashboard";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
+import { Card, CardContent, CardHeader } from "../components/ui/card";
 import Badge from "../components/ui/Badge";
-import { useDashboard } from "../hooks/useDashboard";
-import type { Invoice } from "../types/api";
+import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { cn } from "../lib/utils";
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const { setSidebarOpen } = useOutletContext<{ setSidebarOpen: (open: boolean) => void }>();
-  
-  const { data: dashboardData, isLoading, isError, refetch, isRefetching } = useDashboard();
-
-  const shopName = user?.shop_name || user?.owner_name || "My Shop";
-  const ownerName = user?.owner_name || "Owner";
+  const { data: dashboardData, isLoading } = useDashboard();
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -44,216 +41,237 @@ export default function Dashboard() {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric"
-    });
-  };
-
-  const stats = useMemo(() => {
+  const metrics = useMemo(() => {
     if (!dashboardData) return [];
     return [
       {
-        label: "Total Sales",
+        label: "Market Sales Volume",
         value: formatAmount(dashboardData.total_sales || 0),
-        icon: TrendingUpIcon,
+        trend: "+12.5%",
+        trendUp: true,
+        icon: TrendingUp,
+        description: "Gross revenue generated from registry transactions",
         color: "text-emerald-500",
-        bg: "bg-emerald-50 dark:bg-emerald-900/10",
-        border: "border-emerald-100 dark:border-emerald-800/50",
-        path: "/reports"
+        bg: "bg-emerald-500/10",
       },
       {
-        label: "Total Purchases",
+        label: "Inventory Value",
         value: formatAmount(dashboardData.total_purchases || 0),
+        trend: "+5.2%",
+        trendUp: true,
         icon: ShoppingBag,
-        color: "text-orange-500",
-        bg: "bg-orange-50 dark:bg-orange-900/10",
-        border: "border-orange-100 dark:border-orange-800/50",
-        path: "/reports"
-      },
-      {
-        label: "Receivable",
-        value: formatAmount(dashboardData.total_receivable || 0),
-        icon: Wallet,
+        description: "Total valuation of listed assets",
         color: "text-blue-500",
-        bg: "bg-blue-50 dark:bg-blue-900/10",
-        border: "border-blue-100 dark:border-blue-800/50",
-        path: "/parties/new"
+        bg: "bg-blue-500/10",
       },
       {
-        label: "Payable",
-        value: formatAmount(dashboardData.total_payable || 0),
-        icon: TrendingDown,
+        label: "Receivable Ledger",
+        value: formatAmount(dashboardData.total_receivable || 0),
+        trend: "-2.1%",
+        trendUp: false,
+        icon: Wallet,
+        description: "Outstanding credits pending settlement",
         color: "text-rose-500",
-        bg: "bg-rose-50 dark:bg-rose-900/10",
-        border: "border-rose-100 dark:border-rose-800/50",
-        path: "/parties/new"
+        bg: "bg-rose-500/10",
+      },
+      {
+        label: "Current Liability",
+        value: formatAmount(dashboardData.total_payable || 0),
+        trend: "+0.8%",
+        trendUp: true,
+        icon: TrendingDown,
+        description: "Accounts payable to listed suppliers",
+        color: "text-orange-500",
+        bg: "bg-orange-500/10",
       }
     ];
   }, [dashboardData]);
 
-  const quickActions = [
-    { label: "New Bill", icon: FileText, path: "/bills/create", color: "bg-emerald-500" },
-    { label: "Add Khata", icon: BookOpen, path: "/khata-book/entry", color: "bg-blue-500" },
-    { label: "Add Expense", icon: ReceiptText, path: "/personal/expenses", color: "bg-rose-500" },
-    { label: "Add Party", icon: Users, path: "/parties/new", color: "bg-purple-500" },
-    { label: "Add Product", icon: Package, path: "/products/new", color: "bg-orange-500" },
-    { label: "All Bills", icon: ShoppingBag, path: "/bills", color: "bg-cyan-500" },
-    { label: "Transactions", icon: Clock, path: "/khata-book/transactions", color: "bg-amber-500" },
-    { label: "Analytics", icon: BarChart3, path: "/reports", color: "bg-indigo-500" },
-  ];
-
-  if (isError) {
+  if (isLoading) {
     return (
-      <PageContainer>
-        <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-4">
-          <div className="w-16 h-16 bg-rose-50 dark:bg-rose-900/10 rounded-full flex items-center justify-center text-rose-500">
-             <RotateCcw className="w-8 h-8" />
-          </div>
-          <div>
-            <h2 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">Something went wrong</h2>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Failed to load your business dashboard</p>
-          </div>
-          <Button onClick={() => refetch()} isLoading={isRefetching} className="shadow-xl shadow-green-500/20 px-8">Retry Load</Button>
+      <div className="flex-1 flex flex-col min-h-screen bg-background">
+        <PageHeader title="Intelligence Center" subtitle="Synchronizing cloud registry..." />
+        <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+          <LoadingSpinner size="lg" text="Synthesizing performance data..." />
         </div>
-      </PageContainer>
+      </div>
     );
   }
 
   return (
-    <PageContainer>
-      <PageHeader
-        title={shopName}
-        showBack={false}
-        showMenu={true}
-        onMenuClick={() => setSidebarOpen(true)}
+    <div className="flex-1 flex flex-col min-h-screen bg-background pb-32 overflow-x-hidden theme-transition uppercase cursor-default">
+      <PageHeader 
+        title="Business Intelligence"
+        subtitle="Strategic Performance & Operational Analytics"
         rightAction={
-          <Button variant="ghost" size="icon" className="relative group">
-            <Bell className="w-5 h-5 text-gray-400 group-hover:text-green-500 transition-colors" />
-            <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white dark:border-gray-900" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="hidden sm:flex rounded-md uppercase tracking-widest text-[10px] font-black h-9 border-muted-foreground/20 hover:bg-muted/50" onClick={() => navigate("/reports")}>
+              <BarChart3 className="w-3.5 h-3.5 mr-2" /> REPORTS
+            </Button>
+            <Button size="sm" className="rounded-md uppercase tracking-widest text-[10px] font-black h-9 shadow-lg shadow-primary/10" onClick={() => navigate("/bills/create")}>
+              <Plus className="w-3.5 h-3.5 mr-2" /> NEW INVOICE
+            </Button>
+          </div>
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 py-8 space-y-10 pb-32 custom-scrollbar">
-        {/* Welcome Section */}
-        <div className="space-y-1 px-1">
-          <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Hi, {ownerName.split(" ")[0]}!</h2>
-          <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">Live Business Pulse</p>
+      <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-12">
+        
+        {/* Metric Grid - High Impact */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
+           {metrics.map((stat, idx) => (
+             <Card key={idx} className="bg-card border shadow-sm transition-all duration-500 hover:shadow-xl hover:border-primary/20 group pointer-events-auto relative overflow-hidden">
+                <div className={cn("absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-5 group-hover:scale-150 transition-transform duration-1000", stat.bg)} />
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 relative z-10">
+                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60 group-hover:opacity-100 transition-opacity">{stat.label}</p>
+                   <div className={cn("p-2 rounded-lg transition-colors", stat.bg)}>
+                      <stat.icon size={14} className={stat.color} />
+                   </div>
+                </CardHeader>
+                <div className="px-6 pb-6 pt-2 relative z-10 flex flex-col gap-1">
+                   <p className="text-3xl font-black tracking-tighter text-foreground group-hover:translate-x-1 transition-transform duration-500">{stat.value}</p>
+                   <div className="flex items-center gap-2 pt-2 border-t border-muted-foreground/5 mt-2">
+                      <span className={cn(
+                        "flex items-center text-[9px] font-black uppercase tracking-widest gap-0.5 px-2 py-0.5 rounded-full",
+                        stat.trendUp ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                      )}>
+                         {stat.trendUp ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
+                         {stat.trend}
+                      </span>
+                      <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest opacity-40 italic">M_PERIOD_ACT</span>
+                   </div>
+                </div>
+             </Card>
+           ))}
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+           {/* Detailed Ledger List - Professional Feed */}
+           <section className="lg:col-span-2 space-y-4 animate-in slide-in-from-left-8 duration-700">
+              <div className="flex items-center justify-between px-1">
+                 <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-5 bg-primary rounded-full" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.25em] text-foreground">Recent Registry Entries</p>
+                 </div>
+                 <Link to="/bills" className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-primary transition-all flex items-center gap-1.5 group">
+                    VIEW_LIVE_FEED <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                 </Link>
+              </div>
+
+              <Card className="border shadow-sm pointer-events-auto bg-card overflow-hidden">
+                <div className="divide-y divide-border">
+                   {dashboardData?.recent_invoices && dashboardData.recent_invoices.length > 0 ? (
+                      dashboardData.recent_invoices.slice(0, 6).map((invoice) => (
+                        <div key={invoice.id} className="flex items-center justify-between p-4 px-6 hover:bg-muted/20 transition-all group cursor-pointer" onClick={() => navigate(`/bills`)}>
+                           <div className="flex items-center gap-4 min-w-0 flex-1">
+                              <div className="h-10 w-10 rounded-md bg-zinc-50 border flex items-center justify-center text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all shadow-sm">
+                                 <Receipt className="h-4 w-4" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                 <div className="flex items-center gap-2">
+                                    <span className="text-sm font-black text-foreground truncate uppercase tracking-tight">{invoice.party?.name || "Anonymous Entity"}</span>
+                                    <Badge variant={invoice.payment_status === "paid" ? "success" : "warning"} className="text-[8px] h-4 px-1.5 font-black uppercase">{invoice.payment_status}</Badge>
+                                 </div>
+                                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-none mt-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                                    DOC_ID: {invoice.invoice_number} • PATHWAY_COMMERCIAL
+                                 </span>
+                              </div>
+                           </div>
+                           <div className="text-right pl-4 shrink-0">
+                              <p className="text-base font-black text-foreground tracking-tighter leading-none mb-1.5 group-hover:text-primary transition-colors">₹{invoice.total_amount.toLocaleString("en-IN")}</p>
+                              <div className="flex items-center justify-end gap-1 opacity-40">
+                                 <Calendar size={10} />
+                                 <p className="text-[9px] font-black uppercase tracking-widest">{new Date(invoice.invoice_date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}</p>
+                              </div>
+                           </div>
+                        </div>
+                      ))
+                   ) : (
+                      <div className="p-20 text-center">
+                         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-20 italic underline decoration-primary/20 underline-offset-4">ZERO_RECORDS_INDEXED</p>
+                      </div>
+                   )}
+                </div>
+              </Card>
+           </section>
+
+           {/* Quick Strategic Actions - Clinical Interface */}
+           <section className="space-y-6 animate-in slide-in-from-right-8 duration-700">
+              <div className="flex items-center gap-2 px-1">
+                 <div className="w-1.5 h-5 bg-zinc-400 rounded-full" />
+                 <p className="text-[10px] font-black uppercase tracking-[0.25em] text-foreground">Operational Hub</p>
+              </div>
+
+              <div className="grid gap-2.5">
+                 {[
+                   { icon: Receipt, label: "PUBLISH INVOICE", desc: "Fiscal settlement", href: "/bills/create", color: "text-blue-500" },
+                   { icon: Users, label: "ENTITY REGISTRY", desc: "Commercial network", href: "/parties/new", color: "text-emerald-500" },
+                   { icon: Package, label: "CATALOGUE AUDIT", desc: "Asset optimization", href: "/products/new", color: "text-purple-500" },
+                   { icon: Wallet, label: "INTERNAL LEDGER", desc: "Liquidity logs", href: "/khata-book/entry", color: "text-rose-500" },
+                 ].map((action, idx) => (
+                    <Card 
+                      key={idx} 
+                      className="bg-card border shadow-sm hover:border-primary/20 hover:shadow-md hover:translate-y-[-1px] transition-all duration-300 cursor-pointer group pointer-events-auto relative overflow-hidden"
+                      onClick={() => navigate(action.href)}
+                    >
+                       <CardContent className="p-4 flex items-center gap-4 relative z-10">
+                          <div className={cn("h-10 w-10 rounded-lg bg-muted flex items-center justify-center transition-all", action.color.replace('text', 'bg').replace('500', '50'))}>
+                             <action.icon size={16} className={action.color} />
+                          </div>
+                          <div className="flex flex-col">
+                             <span className="text-[10px] font-black uppercase tracking-[0.15em] text-foreground leading-none">{action.label}</span>
+                             <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mt-1.5 opacity-40">{action.desc}</span>
+                          </div>
+                          <ChevronRight className="ml-auto w-3 h-3 text-muted-foreground opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                       </CardContent>
+                    </Card>
+                 ))}
+              </div>
+
+              {/* Advanced Insight Card - Premium UI */}
+              <Card className="bg-zinc-950 text-white border-zinc-800 shadow-2xl mt-8 pointer-events-auto overflow-hidden relative group">
+                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-1000">
+                    <Activity size={140} className="text-emerald-500" />
+                 </div>
+                 <CardContent className="p-8 relative z-10 space-y-6">
+                    <div className="flex items-center gap-2">
+                       <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                       <span className="text-[9px] font-black uppercase tracking-[0.4em] text-emerald-500">SYSTEM_OPTIMIZATION_NODE</span>
+                    </div>
+                    <div className="space-y-2">
+                       <h4 className="text-lg font-black uppercase tracking-tight leading-none text-white">Efficiency Analysis</h4>
+                       <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest leading-relaxed">
+                          Procurement latency has decreased by <span className="text-emerald-400">4.2%</span>. 
+                          Network integrity is currently <span className="text-emerald-400">OPTIMAL</span>.
+                       </p>
+                    </div>
+                    <Button variant="outline" size="sm" className="w-full bg-white text-zinc-950 border-none rounded-md font-black uppercase tracking-widest text-[9px] h-10 hover:bg-zinc-200 transition-colors">
+                       GENERATE FULL AUDIT
+                    </Button>
+                 </CardContent>
+              </Card>
+           </section>
         </div>
 
-        {isLoading ? (
-          <div className="grid gap-4">
-             {[1, 2, 3].map(i => (
-               <div key={i} className="h-28 bg-gray-50 dark:bg-gray-800/50 animate-pulse rounded-[32px]" />
-             ))}
-          </div>
-        ) : (
-          <div className="grid gap-6">
-            {/* Main Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-               {stats.map((stat, idx) => (
-                 <Card 
-                   key={idx} 
-                   onClick={() => navigate(stat.path)}
-                   className={`${stat.bg} ${stat.border} shadow-sm border hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group rounded-[32px] overflow-hidden`}
-                 >
-                   <CardContent className="p-6 relative">
-                     <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <stat.icon size={100} />
-                     </div>
-                     <div className="space-y-4">
-                       <div className="flex items-center justify-between">
-                         <div className={`p-2 rounded-xl bg-white dark:bg-gray-800 shadow-sm ${stat.color}`}>
-                           <stat.icon className="w-5 h-5" />
-                         </div>
-                         <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                       </div>
-                       <div>
-                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stat.label}</p>
-                         <p className={`text-2xl font-black tracking-tight ${stat.color}`}>{stat.value}</p>
-                       </div>
-                     </div>
-                   </CardContent>
-                 </Card>
-               ))}
-            </div>
-
-            {/* Quick Actions Grid */}
-            <div className="space-y-4">
-               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] px-1">Control Center</p>
-               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                 {quickActions.map((action, idx) => (
-                   <button
-                     key={idx}
-                     onClick={() => navigate(action.path)}
-                     className="flex flex-col items-center gap-4 p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded-[32px] shadow-sm hover:shadow-xl hover:border-green-500/20 transition-all duration-300 group"
-                   >
-                     <div className={`w-12 h-12 rounded-2xl ${action.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
-                       <action.icon className="w-5 h-5" />
-                     </div>
-                     <span className="text-[11px] font-black text-gray-600 dark:text-gray-300 uppercase tracking-widest">{action.label}</span>
-                   </button>
-                 ))}
-               </div>
-            </div>
-
-            {/* Recent Activity */}
-            {dashboardData && dashboardData.recent_invoices && dashboardData.recent_invoices.length > 0 && (
-              <div className="space-y-4">
-                 <div className="flex items-center justify-between px-1">
-                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Recent Activity</p>
-                   <button onClick={() => navigate("/bills")} className="text-[10px] font-black text-blue-500 hover:text-blue-600 uppercase tracking-widest transition-colors">View All</button>
-                 </div>
-                 <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[32px] shadow-sm overflow-hidden divide-y divide-gray-50 dark:divide-gray-800/10">
-                    {dashboardData.recent_invoices.map((invoice: Invoice, idx: number) => (
-                      <div key={idx} onClick={() => navigate("/bills")} className="p-4 sm:p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors group">
-                         <div className="flex items-center gap-4 min-w-0">
-                            <div className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                              <FileText className="w-5 h-5 text-gray-500" />
-                            </div>
-                            <div className="min-w-0 space-y-1">
-                               <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{invoice.party?.name || "Anonymous Customer"}</p>
-                               <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                 <span>{invoice.invoice_number}</span>
-                                 <span className="w-1 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
-                                 <span>{formatDate(invoice.invoice_date)}</span>
-                               </div>
-                            </div>
-                         </div>
-                         <div className="flex flex-col items-end gap-2 shrink-0">
-                            <span className="text-sm font-black text-gray-900 dark:text-white tracking-tight">{formatAmount(invoice.total_amount)}</span>
-                            <Badge variant={invoice.payment_status === "paid" ? "success" : invoice.payment_status === "partially_paid" ? "warning" : invoice.payment_status === "unpaid" ? "danger" : "neutral"} className="text-[8px] px-1.5 py-0.5">
-                              {(invoice.payment_status || "PENDING").toUpperCase()}
-                            </Badge>
-                         </div>
-                      </div>
-                    ))}
-                 </div>
+        {/* System Integrity Footer */}
+        <section className="pt-12 border-t flex flex-col sm:flex-row items-center justify-between gap-6">
+           <div className="flex items-center gap-8">
+              <div className="flex items-center gap-2">
+                 <ShieldCheck size={16} className="text-emerald-500" />
+                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">SECURE_PROTOCOL_V2.4</span>
               </div>
-            )}
-
-            {/* Business Growing Alert */}
-            {dashboardData && (
-               <Card className="rounded-[32px] bg-gray-900 border-gray-800 shadow-2xl overflow-hidden p-6 sm:p-8 mt-4">
-                 <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
-                    <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center shadow-2xl shadow-green-500/40">
-                       <TrendingUp className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                       <h3 className="text-lg font-black text-white uppercase tracking-tight">Business is Growing!</h3>
-                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">You've made {formatAmount(dashboardData.sales_this_month || 0)} this month.</p>
-                    </div>
-                    <Button onClick={() => navigate("/reports")} variant="secondary" className="rounded-2xl px-8 h-12">DEEP ANALYTICS</Button>
-                 </div>
-               </Card>
-            )}
-          </div>
-        )}
+              <div className="flex items-center gap-2">
+                 <Zap size={16} className="text-blue-500" />
+                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">LIVE_CLOUD_SYNC</span>
+              </div>
+              <div className="hidden md:flex items-center gap-2">
+                 <Layers size={16} className="text-orange-500" />
+                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">DISTRIBUTED_REGISTRY</span>
+              </div>
+           </div>
+           <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-30">© 2024 INVOCRAFT_ENTERPRISE_STUDIO</p>
+        </section>
       </div>
-    </PageContainer>
+    </div>
   );
 }

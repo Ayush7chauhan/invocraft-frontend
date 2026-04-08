@@ -1,93 +1,49 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
-import jsPDF from "jspdf";
-import { toCanvas } from "html-to-image";
-import { Plus } from "lucide-react";
-import api from "../utils/api";
+import { useState, useMemo } from "react";
+import { 
+  Search, 
+  Plus, 
+  Filter, 
+  Download, 
+  Trash2, 
+  Eye, 
+  MoreVertical,
+  Receipt,
+  Clock,
+  Calendar,
+  Layers,
+  TrendingUp
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useBills, useDeleteBill } from "../hooks/useBills";
 
-// UI Components
-import PageContainer from "../components/ui/PageContainer";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+import { Card, CardContent } from "../components/ui/card";
+import Badge from "../components/ui/Badge";
 import EmptyState from "../components/ui/EmptyState";
-
-// Bill Sub-components
-import BillSummary from "../components/bills/BillSummary";
-import BillFilters from "../components/bills/BillFilters";
-import BillListItem from "../components/bills/BillListItem";
-import InvoiceModal from "../components/bills/InvoiceModal";
-
-import type { Invoice } from "../types/api";
-
-type FullInvoice = Invoice; // Simplified since we updated the main type
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 export default function Bills() {
   const navigate = useNavigate();
-  const { setSidebarOpen } = useOutletContext<{ setSidebarOpen: (open: boolean) => void }>();
-
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "unpaid" | "partial">("all");
-  const [filterDate, setFilterDate] = useState<"all" | "today" | "week" | "month">("all");
-  const [viewInvoice, setViewInvoice] = useState<FullInvoice | null>(null);
-  const [viewLoading, setViewLoading] = useState(false);
-  const [downloadId, setDownloadId] = useState<number | null>(null);
-  const [pdfInvoice, setPdfInvoice] = useState<FullInvoice | null>(null);
-  const pdfRef = useRef<HTMLDivElement>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  const toLocalDateString = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
+  const { data: bills, isLoading, isError, refetch } = useBills();
+  const deleteMutation = useDeleteBill();
 
-  useEffect(() => {
-    void fetchInvoices();
-  }, [filterStatus, filterDate]);
+  const filteredBills = useMemo(() => {
+    if (!bills) return [];
+    return bills.filter((bill: any) => 
+      bill.bill_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      bill.party_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [bills, searchQuery]);
 
-  const fetchInvoices = async () => {
-    try {
-      setLoading(true);
-      const params: Record<string, string> = {};
-
-      if (filterStatus !== "all") {
-        params.payment_status = filterStatus === "partial" ? "partially_paid" : filterStatus;
-      }
-
-      if (filterDate !== "all") {
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const todayStr = toLocalDateString(today);
-
-        if (filterDate === "today") {
-          params.start_date = todayStr;
-          params.end_date = todayStr;
-        } else if (filterDate === "week") {
-          const weekStart = new Date(today);
-          weekStart.setDate(today.getDate() - today.getDay());
-          params.start_date = toLocalDateString(weekStart);
-          params.end_date = todayStr;
-        } else if (filterDate === "month") {
-          const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-          params.start_date = toLocalDateString(monthStart);
-          params.end_date = todayStr;
-        }
-      }
-
-      const response = await api.get("/invoices", { params });
-
-      if (response.data.success && Array.isArray(response.data.data)) {
-        setInvoices(response.data.data);
-      } else {
-        setInvoices([]);
-      }
-    } catch (error) {
-      console.error("Error fetching invoices:", error);
-      setInvoices([]);
-    } finally {
-      setLoading(false);
+  const handleDelete = async () => {
+    if (deleteId) {
+      await deleteMutation.mutateAsync(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -99,180 +55,166 @@ export default function Bills() {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
-  const handleView = async (invoice: Invoice) => {
-    setViewLoading(true);
-    try {
-      const res = await api.get(`/invoices/${invoice.id}`);
-      if (res.data?.success && res.data?.data) {
-        setViewInvoice(res.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching invoice:", error);
-    } finally {
-      setViewLoading(false);
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "paid": return "success";
+      case "unpaid": return "destructive";
+      case "partially_paid": return "warning";
+      default: return "secondary";
     }
   };
 
-  const handleDownload = async (invoice: Invoice) => {
-    setDownloadId(invoice.id);
-    try {
-      const res = await api.get(`/invoices/${invoice.id}`);
-      if (res.data?.success && res.data?.data) {
-        setPdfInvoice(res.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching invoice for PDF:", error);
-      setDownloadId(null);
-    }
-  };
-
-  useEffect(() => {
-    if (!pdfInvoice || !pdfRef.current) return;
-
-    const timer = setTimeout(() => {
-      toCanvas(pdfRef.current as HTMLDivElement, {
-        pixelRatio: 2,
-        backgroundColor: '#ffffff'
-      })
-        .then((canvas) => {
-          const imgData = canvas.toDataURL("image/png");
-          const pdf = new jsPDF("p", "mm", "a4");
-          const imgWidth = 210;
-          const imgHeight = (canvas.height * imgWidth) / canvas.width;
-          pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
-          pdf.save(`Invoice_${pdfInvoice.invoice_number}.pdf`);
-        })
-        .finally(() => {
-          setPdfInvoice(null);
-          setDownloadId(null);
-        });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [pdfInvoice]);
-
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter((invoice) => {
-      if (!searchQuery.trim()) return true;
-      const query = searchQuery.trim().toLowerCase();
-      return (
-        invoice.invoice_number?.toLowerCase().includes(query) ||
-        invoice.party?.name?.toLowerCase().includes(query) ||
-        invoice.party?.mobile?.toString().includes(query)
-      );
-    });
-  }, [invoices, searchQuery]);
-
-  const totals = useMemo(() => {
-    const total = filteredInvoices.reduce((sum, inv) => sum + inv.total_amount, 0);
-    const paid = filteredInvoices
-      .filter((inv) => inv.payment_status === "paid")
-      .reduce((sum, inv) => sum + inv.total_amount, 0);
-    const unpaid = filteredInvoices
-      .filter((inv) => inv.payment_status === "unpaid")
-      .reduce((sum, inv) => sum + inv.total_amount, 0);
-    return { total, paid, unpaid };
-  }, [filteredInvoices]);
-
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  if (isError) {
+     return (
+        <div className="flex-1 flex flex-col min-h-screen">
+          <PageHeader title="Invoicing" showBack={true} />
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-6">
+             <div className="h-16 w-16 bg-destructive/10 rounded-full flex items-center justify-center text-destructive">
+                <Clock className="w-8 h-8" />
+             </div>
+             <div className="space-y-1">
+                <h2 className="text-lg font-bold text-foreground uppercase tracking-widest leading-none">Authentication Interrupted</h2>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-2 leading-none">Unable to establish secure connection to registry nodes.</p>
+             </div>
+             <Button onClick={() => refetch()} variant="outline" className="px-8 font-black uppercase tracking-widest text-[10px] h-10">RE-INITIATE CONNECTION</Button>
+          </div>
+        </div>
+     );
+  }
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Bills & Invoices"
-        showBack={true}
-        onBackClick={() => navigate(-1)}
-        showMenu={true}
-        onMenuClick={() => setSidebarOpen(true)}
+    <div className="flex-1 flex flex-col min-h-screen bg-background pb-32">
+       <PageHeader 
+        title="Settlement Registry"
+        subtitle="Invoices & Monetary Settlements"
+        rightAction={
+          <Button size="sm" className="rounded-md uppercase tracking-widest text-[10px] font-black h-9 shadow-lg shadow-primary/10" onClick={() => navigate("/bills/new")}>
+            <Plus className="w-3.5 h-3.5 mr-2" /> GENERATE SETTLEMENT
+          </Button>
+        }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 pb-32 custom-scrollbar">
-        <BillSummary
-          totalAmount={formatAmount(totals.total)}
-          paidAmount={formatAmount(totals.paid)}
-          unpaidAmount={formatAmount(totals.unpaid)}
-        />
+       <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full space-y-10">
+          
+          {/* Summary Stats Card */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+             <Card className="border shadow-sm pointer-events-auto bg-card">
+                <CardContent className="p-5 flex items-center gap-4">
+                   <div className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-md flex items-center justify-center border border-emerald-100 shadow-sm"><TrendingUp className="h-5 w-5" /></div>
+                   <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Total Volume Logged</span>
+                      <span className="text-xl font-black text-foreground tracking-tighter">₹4.24M</span>
+                   </div>
+                </CardContent>
+             </Card>
+             <Card className="border shadow-sm pointer-events-auto bg-card hidden lg:block">
+                <CardContent className="p-5 flex items-center gap-4">
+                   <div className="h-10 w-10 bg-rose-50 text-rose-600 rounded-md flex items-center justify-center border border-rose-100 shadow-sm"><Receipt className="h-5 w-5" /></div>
+                   <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Settlement Counter</span>
+                      <span className="text-xl font-black text-foreground tracking-tighter">{bills?.length || 0} Records</span>
+                   </div>
+                </CardContent>
+             </Card>
+             <Card className="border shadow-sm pointer-events-auto bg-card">
+                <CardContent className="p-5 flex items-center gap-4">
+                   <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-md flex items-center justify-center border border-blue-100 shadow-sm"><Download className="h-5 w-5" /></div>
+                   <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Data Portability</span>
+                      <Button variant="ghost" className="h-6 p-0 text-[10px] font-black uppercase tracking-widest text-primary leading-none mt-1 hover:bg-transparent">EXPORT FULL ARCHIVE</Button>
+                   </div>
+                </CardContent>
+             </Card>
+          </div>
 
-        <BillFilters
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          filterStatus={filterStatus}
-          setFilterStatus={setFilterStatus}
-          filterDate={filterDate}
-          setFilterDate={setFilterDate}
-        />
-
-        <div className="space-y-3">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent shadow-xl" />
-              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest animate-pulse">Loading Invoices</p>
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+               <Input 
+                 placeholder="Search settlement records / invoices..." 
+                 value={searchQuery} 
+                 onChange={(e) => setSearchQuery(e.target.value)} 
+                 leftIcon={<Search className="w-4 h-4" />}
+                 className="h-11 shadow-sm border-muted-foreground/10"
+               />
+               <Button variant="outline" className="h-11 px-8 rounded-md uppercase font-black tracking-widest text-[10px] w-full sm:w-auto">
+                 <Filter className="w-4 h-4 mr-2" /> RE-CALIBRATE FEED
+               </Button>
             </div>
-          ) : filteredInvoices.length === 0 ? (
-            <EmptyState
-              title="No Invoices Found"
-              description="Create your first invoice to start tracking your sales."
-              actionLabel="Create Bill"
-              onAction={() => navigate("/bills/create")}
-            />
-          ) : (
-            filteredInvoices.map((inv) => (
-              <BillListItem
-                key={inv.id}
-                invoice={inv}
-                onView={handleView}
-                onDownload={handleDownload}
-                downloadingId={downloadId}
-                formatAmount={formatAmount}
-                formatDate={formatDate}
-              />
-            ))
-          )}
-        </div>
-      </div>
 
-      <Button
-        onClick={() => navigate("/bills/create")}
-        className="fixed right-6 bottom-28 w-14 h-14 rounded-full shadow-2xl bg-green-500 hover:bg-green-600 hover:scale-105 active:scale-95 shadow-green-500/40 z-40 transition-all duration-300 flex items-center justify-center p-0"
-      >
-        <Plus className="w-6 h-6 text-white" />
-      </Button>
-
-      <InvoiceModal
-        invoice={viewInvoice}
-        loading={viewLoading}
-        onClose={() => setViewInvoice(null)}
-        formatAmount={formatAmount}
-        formatDate={formatDate}
-      />
-
-      {/* Fix: Must maintain presence in DOM otherwise html-to-image outputs 0x0 empty chunk */}
-      <div className="absolute left-[-9999px] top-0 opacity-0 pointer-events-none">
-        {pdfInvoice && (
-          <div ref={pdfRef} className="w-[210mm] p-10 bg-white text-gray-900 font-sans">
-            <div className="border-b-2 border-gray-200 pb-6 mb-6 flex justify-between items-start">
-              <div>
-                <h1 className="text-2xl font-black uppercase tracking-tight">{user.shop_name || "My Shop"}</h1>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">{user.shop_address}</p>
-                <p className="text-xs font-bold text-gray-500 mt-1">Phone: {user.mobile_number}</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                 <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.25em]">Registry List</p>
+                    <Badge variant="secondary" className="text-[9px] h-5">{filteredBills.length} Active Modules</Badge>
+                 </div>
+                 <Layers className="w-4 h-4 text-muted-foreground/40" />
               </div>
-              <div className="text-right">
-                <h2 className="text-2xl font-black text-green-500 uppercase">INVOICE</h2>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1"># {pdfInvoice.invoice_number}</p>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">{formatDate(pdfInvoice.invoice_date)}</p>
-              </div>
+
+              {isLoading ? (
+                <div className="grid gap-3">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="h-20 bg-muted/20 animate-pulse rounded-md border" />
+                  ))}
+                </div>
+              ) : filteredBills.length === 0 ? (
+                <EmptyState title="Registry Empty" description="No invoices have been documented in the system yet." icon={<Receipt className="h-12 w-12 text-muted-foreground/20" />} actionLabel="INITIALIZE SETTLEMENT" onAction={() => navigate("/bills/new")} />
+              ) : (
+                <div className="grid gap-3 animate-in fade-in duration-700">
+                  {filteredBills.map((bill: any) => (
+                    <Card key={bill.id} className="group pointer-events-auto hover:border-primary/20 transition-all duration-300 shadow-sm hover:shadow-md overflow-hidden bg-card">
+                      <CardContent className="p-0 pointer-events-auto">
+                        <div className="flex items-center justify-between p-4 px-6 hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => navigate(`/bills/${bill.id}`)}>
+                           <div className="flex items-center gap-5 min-w-0">
+                              <div className="h-12 w-12 rounded-md bg-muted border flex flex-col items-center justify-center text-muted-foreground group-hover:bg-background transition-colors shadow-sm">
+                                 <span className="text-[8px] font-black uppercase leading-none opacity-40">DOC</span>
+                                 <span className="text-xs font-black text-foreground">#{bill.id}</span>
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                 <div className="flex items-center gap-3">
+                                    <h4 className="font-bold text-foreground truncate">{bill.party_name}</h4>
+                                    <Badge variant={getStatusColor(bill.payment_status)} className="text-[8px] h-4 py-0 font-black uppercase">{bill.payment_status || "Logged"}</Badge>
+                                 </div>
+                                 <div className="flex items-center gap-4 mt-1.5 opacity-60">
+                                    <span className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-widest flex items-center gap-1 leading-none"><Calendar className="w-3 h-3" /> {new Date(bill.bill_date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}</span>
+                                    <span className="w-1 h-1 rounded-full bg-border" />
+                                    <span className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-widest leading-none">INV: {bill.bill_number || "AUTO-002"}</span>
+                                 </div>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-10 shrink-0">
+                              <div className="text-right hidden md:block">
+                                 <p className="text-base font-black text-foreground tracking-tight leading-none mb-1">{formatAmount(bill.total_amount)}</p>
+                                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-40">Fiscal Volume</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                 <div className="flex items-center gap-1 group-hover:opacity-100 opacity-0 transition-opacity">
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md hover:bg-muted" onClick={(e) => { e.stopPropagation(); navigate(`/bills/${bill.id}`); }}>
+                                      <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-md hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteId(bill.id); }}>
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                 </div>
+                                 <MoreVertical className="h-4 w-4 text-muted-foreground group-hover:opacity-0 transition-opacity" />
+                              </div>
+                           </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
-    </PageContainer>
+       </div>
+
+       <DeleteConfirmModal 
+        isOpen={!!deleteId} 
+        onClose={() => setDeleteId(null)} 
+        onConfirm={handleDelete} 
+        title="Eliminate Records"
+        message="This will permanently nullify the settlement logs. Archive restoration is currently disabled."
+      />
+    </div>
   );
 }

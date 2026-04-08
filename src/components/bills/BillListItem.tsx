@@ -1,14 +1,12 @@
 import React from "react";
-import { Eye, Download, FileText, User } from "lucide-react";
+import { Download, Eye, FileText, Calendar, CircleDollarSign } from "lucide-react";
 import { Card, CardContent } from "../ui/card";
-import Badge from "../ui/Badge";
-import Button from "../ui/Button";
 import type { Invoice } from "../../types/api";
 
 interface BillListItemProps {
   invoice: Invoice;
-  onView: (inv: Invoice) => void;
-  onDownload: (inv: Invoice) => void;
+  onView: (invoice: Invoice) => void;
+  onDownload: (invoice: Invoice) => void;
   downloadingId: number | null;
   formatAmount: (amount: number) => string;
   formatDate: (date: string) => string;
@@ -23,59 +21,90 @@ const BillListItem: React.FC<BillListItemProps> = ({
   formatDate,
 }) => {
   const isDownloading = downloadingId === invoice.id;
-
-  const statusColors: Record<string, "success" | "danger" | "warning" | "primary" | "neutral" | undefined> = {
-    paid: "success",
-    unpaid: "danger",
-    partially_paid: "warning",
-  };
+  const isPaid = invoice.payment_status === "paid";
+  const isPartial = invoice.payment_status === "partially_paid";
 
   return (
-    <Card className="border-gray-50 dark:border-gray-800 hover:shadow-lg transition-all active:scale-[0.99] group overflow-hidden">
-      <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-4 min-w-0">
-          <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-            <FileText className="w-6 h-6 text-gray-500" />
-          </div>
-          <div className="min-w-0 space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{invoice.invoice_number}</span>
-              <Badge variant={statusColors[invoice.payment_status || "neutral"]} className="text-[8px] px-1.5 py-0.5">
-                {(invoice.payment_status || "PENDING").toUpperCase()}
-              </Badge>
+    <Card className="group rounded-[32px] border-2 border-gray-50 dark:border-gray-800/50 hover:border-emerald-500/20 active:scale-[0.98] transition-all overflow-hidden shadow-sm">
+      <CardContent className="p-0">
+        <div className="p-6 flex items-center justify-between gap-4 cursor-pointer" onClick={() => onView(invoice)}>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isPaid ? 'bg-emerald-500/10 text-emerald-600' : isPartial ? 'bg-orange-500/10 text-orange-600' : 'bg-rose-500/10 text-rose-600'}`}>
+                <FileText className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight truncate">
+                  {invoice.party?.name || "Cash Sale"}
+                </h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
+                    #{invoice.invoice_number}
+                  </span>
+                  <div className="w-1 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase">
+                    <Calendar className="w-2.5 h-2.5" />
+                    {formatDate(invoice.invoice_date)}
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
-              {invoice.party?.name || "Anonymous Customer"}
+          </div>
+
+          <div className="text-right shrink-0">
+            <p className="text-lg font-black text-gray-900 dark:text-white tracking-tighter tabular-nums">
+              {formatAmount(invoice.total_amount)}
             </p>
-            <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-              <span className="flex items-center gap-1"><User className="w-2.5 h-2.5" /> {invoice.party?.mobile || "No Mobile"}</span>
-              <span className="w-1 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
-              <span>{formatDate(invoice.invoice_date)}</span>
+            <div className="flex items-center justify-end gap-1.5 mt-1">
+               <Badge variant={isPaid ? 'success' : isPartial ? 'warning' : 'error'}>
+                 {invoice.payment_status.replace("_", " ")}
+               </Badge>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 pt-4 sm:pt-0 border-t sm:border-t-0 border-gray-50 dark:border-gray-800">
-          <p className="text-lg font-black text-gray-900 dark:text-white tracking-tight">
-            {formatAmount(invoice.total_amount)}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => onView(invoice)} className="w-9 h-9 rounded-xl bg-gray-50 dark:bg-gray-800/50">
+        <div className="bg-gray-50/50 dark:bg-gray-800/50 px-6 py-4 flex items-center justify-between border-t border-gray-50 dark:border-gray-800/80">
+          <div className="flex items-center gap-4">
+             {isPartial && (
+               <div className="flex items-center gap-1.5">
+                 <CircleDollarSign className="w-3.5 h-3.5 text-orange-500" />
+                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paid: {formatAmount(invoice.paid_amount)}</span>
+               </div>
+             )}
+          </div>
+          <div className="flex gap-2.5">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onView(invoice); }}
+              className="p-2.5 rounded-xl bg-white dark:bg-gray-800 text-gray-400 hover:text-emerald-500 hover:shadow-lg shadow-emerald-500/10 transition-all border border-gray-100 dark:border-gray-700"
+              title="View Invoice"
+            >
               <Eye className="w-4 h-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => onDownload(invoice)} 
-              isLoading={isDownloading}
-              className="w-9 h-9 rounded-xl bg-gray-50 dark:bg-gray-800/50"
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDownload(invoice); }}
+              disabled={isDownloading}
+              className={`p-2.5 rounded-xl bg-white dark:bg-gray-800 text-gray-400 hover:text-blue-500 hover:shadow-lg shadow-blue-500/10 transition-all border border-gray-100 dark:border-gray-700 ${isDownloading ? 'animate-pulse opacity-50' : ''}`}
+              title="Download PDF"
             >
               <Download className="w-4 h-4" />
-            </Button>
+            </button>
           </div>
         </div>
       </CardContent>
     </Card>
+  );
+};
+
+const Badge = ({ children, variant }: { children: React.ReactNode; variant: 'success' | 'warning' | 'error' }) => {
+  const styles = {
+    success: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+    warning: "text-orange-500 bg-orange-500/10 border-orange-500/20",
+    error: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded-lg border text-[8px] font-black uppercase tracking-widest ${styles[variant]} transition-all`}>
+      {children}
+    </span>
   );
 };
 

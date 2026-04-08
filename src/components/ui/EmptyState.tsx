@@ -1,6 +1,7 @@
 import React from "react";
 import { FolderOpen } from "lucide-react";
 import Button from "./Button";
+import { cn } from "../../lib/utils";
 
 interface EmptyStateProps {
   title: string;
@@ -14,28 +15,31 @@ interface EmptyStateProps {
 const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
-  icon = <FolderOpen className="w-12 h-12 text-gray-300 dark:text-gray-700" />,
+  icon = <FolderOpen className="h-10 w-10 text-muted-foreground/40" />,
   actionLabel,
   onAction,
   className = "",
 }) => {
   return (
-    <div className={`flex flex-col items-center justify-center p-12 text-center bg-gray-50/50 dark:bg-gray-800/20 rounded-3xl border-2 border-dashed border-gray-100 dark:border-gray-800 ${className}`}>
-      <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-3xl shadow-xl shadow-gray-200/50 dark:shadow-none flex items-center justify-center mb-6 animate-in zoom-in-95 duration-500">
+    <div className={cn(
+      "flex min-h-[400px] flex-col items-center justify-center rounded-md border border-dashed p-8 text-center animate-in fade-in zoom-in duration-500",
+      className
+    )}>
+      <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-muted">
         {icon}
       </div>
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
-        {title}
-      </h3>
+      <h3 className="mt-4 text-lg font-semibold">{title}</h3>
       {description && (
-        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-[260px] mx-auto leading-relaxed mb-8">
+        <p className="mb-4 mt-2 text-sm text-muted-foreground max-w-xs mx-auto">
           {description}
         </p>
       )}
       {actionLabel && onAction && (
-        <Button onClick={onAction} variant="primary" size="md">
-          {actionLabel}
-        </Button>
+        <div className="mt-6">
+          <Button onClick={onAction} variant="outline" size="sm">
+            {actionLabel}
+          </Button>
+        </div>
       )}
     </div>
   );

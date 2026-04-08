@@ -10,13 +10,24 @@ import {
   Store as StoreIcon,
   MoreHorizontal,
   ArrowRight,
-  Loader2,
-  CheckCircle,
+  ShieldCheck,
+  Building2,
+  LayoutDashboard,
+  Save,
+  Rocket
 } from "lucide-react";
 import axios from "axios";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+import { Card, CardContent, CardFooter } from "../components/ui/card";
+import Badge from "../components/ui/Badge";
+import PageHeader from "../components/ui/PageHeader";
+import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { cn } from "../lib/utils";
 
 type BusinessType = "grocery" | "medical" | "general" | "other";
 
@@ -33,11 +44,10 @@ type UpdateShopPayload = {
   business_type?: BusinessType;
 };
 
-
 export default function SetupShop() {
   const { updateUser } = useAuth();
   const navigate = useNavigate();
-  const mobile = localStorage.getItem("temp_mobile") || "";
+  const mobile = localStorage.getItem("temp_mobile") || "IDENTIFIER_NULL";
 
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
@@ -50,22 +60,6 @@ export default function SetupShop() {
   const successTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const newErrors: Record<string, string> = {};
-
-    if (ownerName.trim() && ownerName.trim().length < 2) {
-      newErrors.ownerName = "Owner name must be at least 2 characters";
-    }
-
-    if (shopAddress.trim() && shopAddress.trim().length < 10) {
-      newErrors.shopAddress = "Address must be at least 10 characters";
-    }
-
-    setErrors((prev) => ({
-      ...prev,
-      ownerName: newErrors.ownerName || "",
-      shopAddress: newErrors.shopAddress || "",
-    }));
-
     setIsFormValid(
       ownerName.trim().length >= 2 &&
         (!shopAddress.trim() || shopAddress.trim().length >= 10),
@@ -81,23 +75,6 @@ export default function SetupShop() {
   }, []);
 
   const handleSubmit = async () => {
-    const submitErrors: Record<string, string> = {};
-
-    if (!ownerName.trim()) {
-      submitErrors.ownerName = "Owner name is required";
-    } else if (ownerName.trim().length < 2) {
-      submitErrors.ownerName = "Owner name must be at least 2 characters";
-    }
-
-    if (shopAddress.trim() && shopAddress.trim().length < 10) {
-      submitErrors.shopAddress = "Address must be at least 10 characters";
-    }
-
-    if (Object.keys(submitErrors).length > 0) {
-      setErrors((prev) => ({ ...prev, ...submitErrors }));
-      return;
-    }
-
     if (!isFormValid) return;
 
     setIsLoading(true);
@@ -105,7 +82,6 @@ export default function SetupShop() {
 
     try {
       let tempUser: TempUser = {};
-
       try {
         tempUser = JSON.parse(localStorage.getItem("temp_user") || "{}");
       } catch {
@@ -113,9 +89,8 @@ export default function SetupShop() {
       }
 
       const userId = Number(tempUser.id);
-
       if (!userId || Number.isNaN(userId)) {
-        setErrors({ submit: "User session not found. Please login again." });
+        setErrors({ submit: "Session expired. Please re-authenticate." });
         return;
       }
 
@@ -125,23 +100,14 @@ export default function SetupShop() {
         is_registration_complete: true,
       };
 
-      if (shopName.trim()) {
-        payload.shop_name = shopName.trim();
-      }
-
-      if (shopAddress.trim()) {
-        payload.shop_address = shopAddress.trim();
-      }
-
-      if (businessType) {
-        payload.business_type = businessType;
-      }
+      if (shopName.trim()) payload.shop_name = shopName.trim();
+      if (shopAddress.trim()) payload.shop_address = shopAddress.trim();
+      if (businessType) payload.business_type = businessType;
 
       const response = await api.post("/update-shop-details", payload);
 
       if (response.data?.success) {
         setIsSuccess(true);
-
         const userData = {
           ...response.data.data.user,
           token: response.data.data.token,
@@ -158,21 +124,13 @@ export default function SetupShop() {
           navigate("/dashboard");
         }, 1500);
       } else {
-        setErrors({
-          submit: response.data?.message || "Failed to save shop details",
-        });
+        setErrors({ submit: response.data?.message || "Registry persistence failed" });
       }
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
-        setErrors({
-          submit:
-            error.response?.data?.message ||
-            "Failed to save shop details. Please try again.",
-        });
+        setErrors({ submit: error.response?.data?.message || "Onboarding protocol interupted." });
       } else {
-        setErrors({
-          submit: "Failed to save shop details. Please try again.",
-        });
+        setErrors({ submit: "System configuration failure." });
       }
     } finally {
       setIsLoading(false);
@@ -189,238 +147,166 @@ export default function SetupShop() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col items-center justify-center px-4">
-        <div className="flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-full bg-[#22C55E] dark:bg-green-600 flex items-center justify-center mb-6 animate-bounce">
-            <CheckCircle className="w-12 h-12 text-white" />
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+        <div className="flex flex-col items-center text-center space-y-6 animate-in fade-in zoom-in duration-700">
+          <div className="w-24 h-24 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-2xl shadow-emerald-500/20">
+            <CheckCircle2 className="w-12 h-12 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-[#111827] dark:text-white mb-2">
-            Setup Complete!
-          </h2>
-          <p className="text-sm text-[#6B7280] dark:text-gray-400">
-            Redirecting to dashboard...
-          </p>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black text-foreground tracking-tighter uppercase tracking-[0.05em]">Protocol Synchronized</h2>
+            <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest leading-none">Redirecting to strategic dashboard node...</p>
+          </div>
+          <div className="pt-4">
+             <LoadingSpinner size="md" />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col items-center px-4 py-8 overflow-y-auto hide-scrollbar">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center text-center">
-          <div className="w-16 h-16 rounded-full bg-[#22C55E] dark:bg-green-600 flex items-center justify-center mb-4">
-            <Store className="w-7 h-7 text-white" />
+    <div className="min-h-screen bg-background flex flex-col pb-32 overflow-x-hidden theme-transition">
+       <PageHeader 
+        title="Strategic Configuration" 
+        subtitle="Business Onboarding & Entity Initialization" 
+       />
+
+       <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 max-w-2xl mx-auto w-full space-y-12">
+          <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+             
+             {/* Section 1: Identity */}
+             <div className="space-y-6">
+                <div className="flex items-center gap-2 px-1">
+                   <div className="w-1.5 h-5 bg-emerald-500 rounded-full" />
+                   <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Principal Identification</h3>
+                </div>
+
+                <Card className="border shadow-sm bg-card pointer-events-auto">
+                   <CardContent className="p-8 space-y-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         <Input 
+                            label="Legal Principal Name" 
+                            placeholder="Full Name" 
+                            value={ownerName} 
+                            onChange={(e) => {
+                              setOwnerName(e.target.value);
+                              setErrors(p => ({...p, ownerName: ""}));
+                            }} 
+                            error={errors.ownerName}
+                            leftIcon={<User className="h-4 w-4" />}
+                         />
+                         <div className="space-y-1.5">
+                            <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-0.5 opacity-60">Verified Mobile Node</label>
+                            <div className="flex items-center gap-3 border border-input rounded-md px-4 h-10 bg-muted/20 opacity-80">
+                               <Phone className="w-3.5 h-3.5 text-muted-foreground/50" />
+                               <span className="text-[11px] font-black tracking-widest uppercase text-foreground">
+                                 {formatMobile(mobile)}
+                               </span>
+                               <Badge variant="success" className="h-4 px-2 text-[8px] font-black ml-auto">AUTHENTICATED</Badge>
+                            </div>
+                         </div>
+                      </div>
+                   </CardContent>
+                </Card>
+             </div>
+
+             {/* Section 2: Enterprise Details */}
+             <div className="space-y-6">
+                <div className="flex items-center gap-2 px-1">
+                   <div className="w-1.5 h-5 bg-blue-500 rounded-full" />
+                   <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Entity Documentation</h3>
+                </div>
+
+                <Card className="border shadow-sm bg-card pointer-events-auto">
+                   <CardContent className="p-8 space-y-8">
+                      <Input 
+                         label="Entity Trade Name (Optional)" 
+                         placeholder="Business or Shop Name" 
+                         value={shopName} 
+                         onChange={(e) => setShopName(e.target.value)} 
+                         leftIcon={<Building2 className="h-4 w-4" />}
+                      />
+                      
+                      <div className="space-y-1.5">
+                         <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-0.5 opacity-60">Physical Headquarters (Address)</label>
+                         <div className="relative group">
+                            <textarea 
+                               placeholder="Complete functional location..." 
+                               value={shopAddress} 
+                               onChange={(e) => {
+                                 setShopAddress(e.target.value);
+                                 setErrors(p => ({...p, shopAddress: ""}));
+                               }}
+                               className={cn(
+                                 "flex min-h-[100px] w-full rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-sm outline-none pl-10",
+                                 errors.shopAddress && "border-destructive focus-visible:ring-destructive"
+                               )}
+                            />
+                            <MapPin className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/40 group-focus-within:text-emerald-500 transition-colors" />
+                         </div>
+                         {errors.shopAddress && <p className="text-[10px] font-black text-destructive uppercase tracking-widest mt-1.5 ml-1">{errors.shopAddress}</p>}
+                      </div>
+                   </CardContent>
+                </Card>
+             </div>
+
+             {/* Section 3: Industry Classification */}
+             <div className="space-y-6">
+                <div className="flex items-center gap-2 px-1">
+                   <div className="w-1.5 h-5 bg-zinc-900 rounded-full" />
+                   <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Industrial sector mapping</h3>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                   <TypeButton 
+                      label="Retail" 
+                      icon={<Apple className="h-4 w-4" />} 
+                      selected={businessType === "grocery"} 
+                      onClick={() => setBusinessType("grocery")} 
+                   />
+                   <TypeButton 
+                      label="Pharma" 
+                      icon={<Stethoscope className="h-4 w-4" />} 
+                      selected={businessType === "medical"} 
+                      onClick={() => setBusinessType("medical")} 
+                   />
+                   <TypeButton 
+                      label="General" 
+                      icon={<StoreIcon className="h-4 w-4" />} 
+                      selected={businessType === "general"} 
+                      onClick={() => setBusinessType("general")} 
+                   />
+                   <TypeButton 
+                      label="Protocol_X" 
+                      icon={<MoreHorizontal className="h-4 w-4" />} 
+                      selected={businessType === "other"} 
+                      onClick={() => setBusinessType("other")} 
+                   />
+                </div>
+             </div>
+
+             {errors.submit && (
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md text-center animate-pulse">
+                   <p className="text-[10px] font-black text-destructive uppercase tracking-widest">{errors.submit}</p>
+                </div>
+             )}
+
+             <div className="pt-8 border-t flex flex-col items-center gap-6">
+                <Button 
+                   onClick={handleSubmit} 
+                   disabled={!isFormValid || isLoading} 
+                   isLoading={isLoading}
+                   className="w-full h-14 rounded-md font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-emerald-500/20 group overflow-hidden relative"
+                >
+                   COMPLETE INITIALIZATION <Rocket className="ml-2 w-4 h-4 group-hover:translate-y-[-2px] group-hover:translate-x-[2px] transition-transform" />
+                </Button>
+                <div className="flex items-center gap-2">
+                   <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                   <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.25em] opacity-40">SYSTEM_NODE: SHADCN-V2.4</span>
+                </div>
+             </div>
           </div>
-
-          <h1 className="text-2xl font-bold text-[#111827] dark:text-white">
-            Set Up Your Shop
-          </h1>
-
-          <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-2">
-            Complete your profile to continue
-          </p>
-        </div>
-
-        <div className="mt-8 border-t border-[#F3F4F6] dark:border-gray-800" />
-
-        <div className="mt-6 space-y-5">
-          {/* Shop Name */}
-          <div>
-            <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
-              Shop Name{" "}
-              <span className="text-[#9CA3AF] dark:text-gray-500">
-                (Optional)
-              </span>
-            </label>
-
-            <div
-              className={`mt-2 flex items-center border rounded-xl px-4 py-3 ${
-                errors.shopName
-                  ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
-                  : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
-              }`}
-            >
-              <input
-                type="text"
-                placeholder="Enter your shop name (optional)"
-                value={shopName}
-                onChange={(e) => {
-                  setShopName(e.target.value);
-                  if (errors.shopName) {
-                    setErrors((prev) => ({ ...prev, shopName: "" }));
-                  }
-                }}
-                className="w-full text-sm outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-              <StoreIcon className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
-            </div>
-
-            {errors.shopName && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                {errors.shopName}
-              </p>
-            )}
-          </div>
-
-          {/* Owner Name */}
-          <div>
-            <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
-              Owner Name{" "}
-              <span className="text-[#EF4444] dark:text-red-400">*</span>
-            </label>
-
-            <div
-              className={`mt-2 flex items-center border rounded-xl px-4 py-3 ${
-                errors.ownerName
-                  ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
-                  : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
-              }`}
-            >
-              <input
-                type="text"
-                placeholder="Enter your full name"
-                value={ownerName}
-                onChange={(e) => {
-                  setOwnerName(e.target.value);
-                  if (errors.ownerName) {
-                    setErrors((prev) => ({ ...prev, ownerName: "" }));
-                  }
-                }}
-                className="w-full text-sm outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              />
-              <User className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
-            </div>
-
-            {errors.ownerName && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                {errors.ownerName}
-              </p>
-            )}
-          </div>
-
-          {/* Mobile */}
-          <div>
-            <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
-              Mobile Number
-            </label>
-
-            <div className="mt-2 flex items-center gap-3 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-gray-50 dark:bg-gray-800/50">
-              <span className="text-sm text-[#6B7280] dark:text-gray-400">
-                {formatMobile(mobile)}
-              </span>
-              <CheckCircle2 className="w-4 h-4 text-[#22C55E] dark:text-green-400" />
-              <Phone className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
-            </div>
-          </div>
-
-          {/* Address */}
-          <div>
-            <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
-              Shop Address{" "}
-              <span className="text-[#9CA3AF] dark:text-gray-500">
-                (Optional)
-              </span>
-            </label>
-
-            <div
-              className={`mt-2 flex items-start border rounded-xl px-4 py-3 ${
-                errors.shopAddress
-                  ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
-                  : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
-              }`}
-            >
-              <textarea
-                placeholder="Enter your complete shop address"
-                value={shopAddress}
-                onChange={(e) => {
-                  setShopAddress(e.target.value);
-                  if (errors.shopAddress) {
-                    setErrors((prev) => ({ ...prev, shopAddress: "" }));
-                  }
-                }}
-                rows={3}
-                className="w-full text-sm outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none"
-              />
-              <MapPin className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500 mt-1 shrink-0" />
-            </div>
-
-            {errors.shopAddress && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                {errors.shopAddress}
-              </p>
-            )}
-          </div>
-
-          {/* Business Type */}
-          <div>
-            <label className="text-sm font-medium text-[#111827] dark:text-gray-200">
-              Business Type
-            </label>
-
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <TypeButton
-                label="Grocery"
-                icon={<Apple className="w-4 h-4" />}
-                selected={businessType === "grocery"}
-                onClick={() => setBusinessType("grocery")}
-              />
-              <TypeButton
-                label="Medical"
-                icon={<Stethoscope className="w-4 h-4" />}
-                selected={businessType === "medical"}
-                onClick={() => setBusinessType("medical")}
-              />
-              <TypeButton
-                label="General Store"
-                icon={<StoreIcon className="w-4 h-4" />}
-                selected={businessType === "general"}
-                onClick={() => setBusinessType("general")}
-              />
-              <TypeButton
-                label="Other"
-                icon={<MoreHorizontal className="w-4 h-4" />}
-                selected={businessType === "other"}
-                onClick={() => setBusinessType("other")}
-              />
-            </div>
-          </div>
-        </div>
-
-        {errors.submit && (
-          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <p className="text-sm text-red-600 dark:text-red-400">
-              {errors.submit}
-            </p>
-          </div>
-        )}
-
-        <button
-          className={`w-full mt-8 font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition ${
-            isFormValid && !isLoading
-              ? "bg-[#86E2A8] dark:bg-green-600 text-white hover:bg-[#7ED3B3] dark:hover:bg-green-700"
-              : "bg-[#E5E7EB] dark:bg-gray-700 text-[#9CA3AF] dark:text-gray-500 cursor-not-allowed"
-          }`}
-          onClick={handleSubmit}
-          disabled={!isFormValid || isLoading}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              Continue to Dashboard
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
-        </button>
-
-        <p className="text-center text-xs text-[#9CA3AF] dark:text-gray-500 mt-3">
-          You can edit this later
-        </p>
-      </div>
+       </div>
     </div>
   );
 }
@@ -440,14 +326,30 @@ function TypeButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-center gap-2 py-3 rounded-xl border text-sm transition ${
+      className={cn(
+        "flex flex-col items-center justify-center gap-4 p-6 rounded-xl border transition-all duration-300 group relative",
         selected
-          ? "border-[#22C55E] dark:border-green-500 text-[#16A34A] dark:text-green-400 bg-[#ECFDF3] dark:bg-green-900/30"
-          : "border-[#E5E7EB] dark:border-gray-700 text-[#374151] dark:text-gray-300 bg-white dark:bg-gray-800 hover:border-[#22C55E] dark:hover:border-green-500"
-      }`}
+          ? "border-emerald-500 bg-emerald-50/50 shadow-md ring-1 ring-emerald-500/20"
+          : "border-input bg-card hover:border-emerald-200 hover:bg-zinc-50/50 shadow-sm"
+      )}
     >
-      <span className="text-[#22C55E] dark:text-green-400">{icon}</span>
-      {label}
+      <div className={cn(
+        "h-10 w-10 rounded-lg flex items-center justify-center transition-all",
+        selected ? "bg-emerald-500 text-white shadow-lg" : "bg-muted text-muted-foreground group-hover:bg-emerald-50 group-hover:text-emerald-500"
+      )}>
+        {icon}
+      </div>
+      <span className={cn(
+        "text-[10px] font-black uppercase tracking-widest",
+        selected ? "text-emerald-700" : "text-muted-foreground group-hover:text-foreground"
+      )}>
+        {label}
+      </span>
+      {selected && (
+        <div className="absolute top-2 right-2">
+           <CheckCircle2 size={12} className="text-emerald-500" />
+        </div>
+      )}
     </button>
   );
 }

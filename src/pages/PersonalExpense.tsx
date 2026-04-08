@@ -1,244 +1,92 @@
-import { useState, useEffect } from "react";
-import {
-  ArrowLeft,
+import { useState, useMemo } from "react";
+import { 
+  Plus, 
+  Search, 
+  Trash2, 
+  Edit2, 
+  Wallet, 
+  Calendar, 
+  FileText, 
+  History,
   TrendingDown,
-  Calendar,
-  DollarSign,
-  Search,
-  Loader2,
-  CheckCircle2,
-  X,
-  Edit2,
-  Trash2,
-  Plus,
-  Tag,
+  ChevronRight,
+  Filter,
+  Activity,
+  ShieldCheck,
+  Zap,
+  Layers,
+  PieChart
 } from "lucide-react";
-import api from "../utils/api";
-import { Autocomplete } from "../components/ui/autocomplete";
-import axios from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { expenseSchema, type ExpenseFormValues } from "../lib/validationSchema";
+import { useExpenses, useCreateExpense, useDeleteExpense } from "../hooks/useExpenses";
 
-type PersonalExpense = {
-  id: number;
-  title: string;
-  category: string;
-  amount: number;
-  gst_rate?: number;
-  expense_date: string;
-  description: string | null;
-  payment_method: "cash" | "upi" | "card" | "bank_transfer" | "other";
-  reference_number: string | null;
-  notes: string | null;
-};
-
-import { useNavigate } from "react-router-dom";
+import PageHeader from "../components/ui/PageHeader";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+import { Card, CardContent } from "../components/ui/card";
+import Badge from "../components/ui/Badge";
+import EmptyState from "../components/ui/EmptyState";
+import LoadingSpinner from "../components/ui/LoadingSpinner";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
+import { cn } from "../lib/utils";
 
 export default function PersonalExpense() {
-  const navigate = useNavigate();
-  const onBack = () => navigate(-1);
-
   const [showForm, setShowForm] = useState(false);
-  const [expenses, setExpenses] = useState<PersonalExpense[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: "",
-    category: "",
-    amount: "",
-    gst_rate: "",
-    expense_date: new Date().toISOString().split("T")[0],
-    description: "",
-    payment_method: "cash" as
-      | "cash"
-      | "upi"
-      | "card"
-      | "bank_transfer"
-      | "other",
-    reference_number: "",
-    notes: "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const { data: expenses, isLoading } = useExpenses();
+  const createMutation = useCreateExpense();
+  const deleteMutation = useDeleteExpense();
 
-  const categories = [
-    { value: "food", label: "Food" },
-    { value: "travel", label: "Travel" },
-    { value: "entertainment", label: "Entertainment" },
-    { value: "shopping", label: "Shopping" },
-    { value: "bills", label: "Bills" },
-    { value: "health", label: "Health" },
-    { value: "education", label: "Education" },
-    { value: "transport", label: "Transport" },
-    { value: "gifts", label: "Gifts" },
-    { value: "electronics", label: "Electronics" },
-    { value: "clothing", label: "Clothing" },
-    { value: "groceries", label: "Groceries" },
-    { value: "furniture", label: "Furniture" },
-    { value: "appliances", label: "Appliances" },
-    { value: "books", label: "Books" },
-    { value: "sports", label: "Sports" },
-    { value: "beauty", label: "Beauty" },
-    { value: "other", label: "Other" },
-  ];
-
-  const paymentMethods = [
-    { value: "cash", label: "Cash" },
-    { value: "upi", label: "UPI" },
-    { value: "card", label: "Card" },
-    { value: "bank_transfer", label: "Bank Transfer" },
-    { value: "other", label: "Other" },
-  ];
-
-  useEffect(() => {
-    fetchExpenses();
-  }, []);
-
-  const fetchExpenses = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get("/personal-expenses");
-      if (response.data.success) {
-        setExpenses(response.data.data);
-      }
-    } catch (error) {
-      console.error("Error fetching expenses:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const newErrors: Record<string, string> = {};
-    if (!formData.title.trim()) {
-      newErrors.title = "Title is required";
-    }
-    if (!formData.category) {
-      newErrors.category = "Category is required";
-    }
-    if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      newErrors.amount = "Amount must be greater than 0";
-    }
-    if (!formData.expense_date) {
-      newErrors.expense_date = "Date is required";
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrors({});
-
-    try {
-      const baseAmount = parseFloat(formData.amount);
-      const gstRate = formData.gst_rate ? parseFloat(formData.gst_rate) : 0;
-      const totalAmount =
-        gstRate > 0 ? baseAmount + (baseAmount * gstRate) / 100 : baseAmount;
-
-      const payload = {
-        title: formData.title.trim(),
-        category: formData.category,
-        amount: Math.round(totalAmount * 100) / 100,
-        expense_date: formData.expense_date,
-        description: formData.description.trim() || null,
-        payment_method: formData.payment_method,
-        reference_number: formData.reference_number.trim() || null,
-        notes: formData.notes.trim() || null,
-      };
-
-      if (editingId) {
-        await api.put(`/personal-expenses/${editingId}`, payload);
-      } else {
-        await api.post("/personal-expenses", payload);
-      }
-
-      resetForm();
-      fetchExpenses();
-      window.dispatchEvent(new CustomEvent("dashboard-refresh"));
-    } catch (error: unknown) {
-      let message = "Failed to save expense. Please try again.";
-
-      if (axios.isAxiosError(error)) {
-        const res = error.response?.data;
-        message = res?.message ?? message;
-
-        if (res?.errors) {
-          const first = Object.values(res.errors).flat();
-          if (first.length) message = String(first[0]);
-        }
-      }
-
-      setErrors({ submit: message });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<ExpenseFormValues>({
+    resolver: zodResolver(expenseSchema) as any,
+    defaultValues: {
       title: "",
+      amount: 0,
+      date: new Date().toISOString().split("T")[0],
       category: "",
-      amount: "",
-      gst_rate: "",
-      expense_date: new Date().toISOString().split("T")[0],
+      paymentMethod: "cash",
       description: "",
-      payment_method: "cash",
-      reference_number: "",
-      notes: "",
-    });
-    setErrors({});
-    setShowForm(false);
-    setEditingId(null);
-  };
-  const handleEdit = (expense: PersonalExpense) => {
-    setFormData({
-      title: expense.title ?? "",
-      category: expense.category,
-      amount: String(expense.amount),
-      gst_rate: expense.gst_rate ? String(expense.gst_rate) : "",
-      expense_date: expense.expense_date,
-      description: expense.description ?? "",
-      payment_method: expense.payment_method,
-      reference_number: expense.reference_number ?? "",
-      notes: expense.notes ?? "",
-    });
+    }
+  });
 
-    setEditingId(expense.id);
-    setShowForm(true);
-  };
+  const filteredExpenses = useMemo(() => {
+    if (!expenses) return [];
+    return expenses.filter((e: any) => 
+      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [expenses, searchQuery]);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this expense?")) return;
+  const totalExpense = useMemo(() => {
+    if (!expenses) return 0;
+    return expenses.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
+  }, [expenses]);
 
+  const onSubmit = async (data: ExpenseFormValues) => {
     try {
-      await api.delete(`/personal-expenses/${id}`);
-      fetchExpenses();
-      window.dispatchEvent(new CustomEvent("dashboard-refresh"));
+      await createMutation.mutateAsync(data);
+      reset();
+      setShowForm(false);
     } catch (e) {
-      console.error(e);
-      alert("Failed to delete expense");
+      console.error("Archive commit failure:", e);
     }
   };
 
-  const filteredExpenses = expenses.filter((expense) => {
-    const matchesSearch =
-      expense.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (expense.description &&
-        expense.description
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase())) ||
-      (expense.title &&
-        expense.title.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory =
-      filterCategory === "all" || expense.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const handleDelete = async () => {
+    if (deleteId) {
+      await deleteMutation.mutateAsync(deleteId);
+      setDeleteId(null);
+    }
+  };
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -248,452 +96,212 @@ export default function PersonalExpense() {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return "Today";
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return "Yesterday";
-    } else {
-      return date.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="px-4 py-4 flex items-center gap-3 border-b border-[#F3F4F6] dark:border-gray-800 bg-white dark:bg-gray-900 sticky top-0 z-10">
-        <button
-          onClick={onBack}
-          className="w-8 h-8 flex items-center justify-center"
-          aria-label="Go back"
-        >
-          <ArrowLeft className="w-5 h-5 text-[#111827] dark:text-white" />
-        </button>
-        <h1 className="text-lg font-bold text-[#111827] dark:text-white flex-1">
-          {showForm
-            ? editingId
-              ? "Edit Expense"
-              : "Add Expense/Purchase"
-            : "Personal Expenses & Purchases"}
-        </h1>
+    <div className="flex-1 flex flex-col min-h-screen bg-background pb-32 overflow-x-hidden theme-transition uppercase cursor-default">
+      <PageHeader 
+        title={showForm ? "Initialize Outflow Hub" : "Liquidity Archive: Personal"} 
+        subtitle={showForm ? "Configure Personal Internal Outflow Node" : "Strategic Personal Liquidity & Internal Expense Ledger"}
+        showBack={showForm} 
+        onBackClick={() => setShowForm(false)}
+        rightAction={
+          !showForm && (
+            <Button size="sm" onClick={() => setShowForm(true)} className="rounded-md uppercase tracking-widest text-[10px] font-black h-9 shadow-lg shadow-primary/10">
+              <Plus className="w-3.5 h-3.5 mr-2" /> RECORD OUTFLOW
+            </Button>
+          )
+        }
+      />
+
+      <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full space-y-12">
         {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="w-9 h-9 rounded-xl bg-[#22C55E] dark:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
+           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
+              <Card className="border bg-card shadow-sm pointer-events-auto p-6 flex flex-col justify-between h-32 hover:border-rose-200 transition-all group overflow-hidden relative">
+                 <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000 text-rose-500">
+                    <TrendingDown size={100} />
+                 </div>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 opacity-60">Consolidated Outflow</span>
+                 <div className="flex items-end justify-between relative z-10">
+                    <span className="text-3xl font-black text-rose-700 tracking-tighter">{formatAmount(totalExpense)}</span>
+                    <Badge variant="outline" className="text-[9px] font-black h-5 uppercase tracking-widest bg-rose-50 text-rose-600 border-rose-100 italic">VAL_OUTFLOW</Badge>
+                 </div>
+              </Card>
+              <Card className="border bg-card shadow-sm pointer-events-auto p-6 flex flex-col justify-between h-32 hover:border-blue-200 transition-all group overflow-hidden relative">
+                 <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000 text-blue-500">
+                    <History size={100} />
+                 </div>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 opacity-60">Registry Density</span>
+                 <div className="flex items-end justify-between relative z-10">
+                    <span className="text-2xl font-black text-blue-700 tracking-tighter uppercase">{expenses?.length || 0} NODES</span>
+                    <Badge variant="outline" className="text-[9px] font-black h-5 uppercase tracking-widest bg-blue-50 text-blue-600 border-blue-100 italic">LOG_STABLE</Badge>
+                 </div>
+              </Card>
+              <Card className="border bg-card shadow-sm pointer-events-auto p-6 flex flex-col justify-between h-32 hover:border-emerald-200 transition-all group overflow-hidden relative hidden lg:flex">
+                 <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000 text-emerald-500">
+                    <PieChart size={100} />
+                 </div>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 opacity-60">Efficiency Node</span>
+                 <div className="flex items-end justify-between relative z-10">
+                    <span className="text-2xl font-black text-emerald-700 tracking-tighter uppercase italic opacity-60">OPTIMAL_FLOW</span>
+                 </div>
+              </Card>
+           </section>
         )}
-        {showForm && (
-          <button
-            onClick={resetForm}
-            className="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+        {showForm ? (
+          <form onSubmit={handleSubmit(onSubmit)} className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-12 pb-20">
+             <div className="space-y-4">
+                <div className="flex items-center gap-2 px-1">
+                   <div className="w-1.5 h-5 bg-rose-500 rounded-full transition-all group-hover:h-6" />
+                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Liquidity Documentation</h3>
+                </div>
+                
+                <Card className="border shadow-sm pointer-events-auto bg-card">
+                   <CardContent className="p-8 space-y-8">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                         <Input label="Registry Descriptor" placeholder="e.g. Office Logistics, Utilities" {...register("title")} error={errors.title?.message} leftIcon={<FileText className="w-4 h-4" />} />
+                         <Input label="Fiscal Valuation" type="number" placeholder="0.00" {...register("amount")} error={errors.amount?.message} leftIcon={<span className="text-[11px] font-black opacity-30">₹</span>} />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t pt-8">
+                         <Input label="Registry Initialization Date" type="date" {...register("date")} error={errors.date?.message} leftIcon={<Calendar className="w-4 h-4" />} />
+                         <Input label="Asset Classification Node" placeholder="e.g. OPERATING, PERSONAL" {...register("category")} error={errors.category?.message} leftIcon={<History className="w-4 h-4" />} />
+                      </div>
+
+                      <div className="space-y-2 border-t pt-8">
+                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 opacity-60">Settlement Protocol Pathway</label>
+                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            {["cash", "upi", "card", "bank_transfer"].map((method) => (
+                               <button
+                                  key={method}
+                                  type="button"
+                                  onClick={() => reset({ ...register, paymentMethod: method as any } as any)}
+                                  className="h-11 rounded-lg border border-input text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-muted transition-all flex items-center justify-center shadow-sm"
+                               >
+                                  {method.replace('_', ' ')}
+                               </button>
+                            ))}
+                         </div>
+                      </div>
+
+                      <div className="space-y-1.5 border-t pt-8">
+                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 opacity-60">Supplementary Registry Metadata</label>
+                         <textarea 
+                            {...register("description")}
+                            placeholder="Detailed archival specifications..."
+                            className="flex min-h-[140px] w-full rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-sm outline-none"
+                         />
+                      </div>
+                   </CardContent>
+                   <div className="p-8 bg-muted/10 border-t flex flex-col sm:flex-row gap-4">
+                      <Button type="button" variant="outline" className="flex-1 h-12 uppercase font-black tracking-widest text-[11px]" onClick={() => setShowForm(false)}>DISCARD DRAFT</Button>
+                      <Button type="submit" isLoading={isSubmitting} className="flex-1 h-12 uppercase font-black tracking-widest text-[11px] shadow-2xl shadow-primary/20">COMMIT OUTFLOW RECORD</Button>
+                   </div>
+                </Card>
+             </div>
+             
+             <div className="flex items-center justify-center gap-2 opacity-30 pt-4">
+                <ShieldCheck size={14} className="text-primary" />
+                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em]">LEDGER_PROTOCOL_ENCRYPTED: V2.4</span>
+             </div>
+          </form>
+        ) : (
+          <div className="space-y-12">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+               <Input 
+                 placeholder="Search liquidity archive (Descriptor, Node)..." 
+                 value={searchQuery} 
+                 onChange={(e) => setSearchQuery(e.target.value)} 
+                 leftIcon={<Search className="w-4 h-4" />}
+                 className="h-11 shadow-sm border-muted-foreground/10"
+               />
+               <Button variant="outline" className="h-11 px-8 rounded-md uppercase font-black tracking-widest text-[10px] w-full sm:w-auto">
+                  <Filter className="w-3.5 h-3.5 mr-2" /> RE-CALIBRATE FEED
+               </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                 <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.25em]">Liquidity Feed Archive</p>
+                    <Badge variant="secondary" className="text-[9px] h-5">{filteredExpenses.length} NODES_ACTIVE</Badge>
+                 </div>
+                 <Activity size={14} className="text-muted-foreground/40" />
+              </div>
+
+              {isLoading ? (
+                <div className="grid gap-3">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="h-20 bg-muted/20 animate-pulse rounded-md border" />
+                  ))}
+                </div>
+              ) : filteredExpenses.length === 0 ? (
+                <EmptyState 
+                   title="Archive Offline" 
+                   description="Your personal liquidity ledger has not been initialized with any outflow nodes." 
+                   icon={<Wallet className="h-12 w-12 text-muted-foreground/20" />} 
+                   actionLabel="INITIATE RECORD" 
+                   onAction={() => setShowForm(true)} 
+                />
+              ) : (
+                <div className="grid gap-3 animate-in fade-in duration-700">
+                  {filteredExpenses.map((expense: any) => (
+                    <Card key={expense.id} className="group pointer-events-auto hover:border-primary/20 transition-all duration-300 shadow-sm hover:shadow-md bg-card overflow-hidden">
+                      <CardContent className="p-0 flex items-stretch justify-between h-20">
+                        <div className="flex items-center gap-4 px-4 flex-1 min-w-0">
+                          <div className="h-11 w-11 rounded-lg bg-muted border flex items-center justify-center text-muted-foreground group-hover:bg-rose-50 group-hover:text-rose-600 transition-all shadow-sm group-hover:scale-105">
+                            <Plus className="h-4 w-4" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-2">
+                               <h4 className="font-black text-foreground uppercase tracking-widest text-sm truncate">{expense.title}</h4>
+                               <ChevronRight className="w-3 h-3 text-muted-foreground/20 group-hover:translate-x-1 transition-transform" />
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 opacity-60">
+                               <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-none truncate whitespace-nowrap">
+                                 {expense.category || "UNCLASSIFIED_NODE"}
+                               </span>
+                               <span className="w-1 h-1 rounded-full bg-border" />
+                               <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-none uppercase">
+                                 {expense.payment_method}
+                               </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col justify-center items-end px-6 bg-muted/5 group-hover:bg-muted/10 transition-colors border-l text-right shrink-0">
+                           <p className="text-xl font-black text-foreground tracking-tighter leading-none mb-1.5 group-hover:text-rose-600 transition-colors">
+                             {formatAmount(expense.amount)}
+                           </p>
+                           <div className="flex items-center gap-2">
+                             <span className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-40">
+                               {new Date(expense.date).toLocaleDateString("en-IN", { day: 'numeric', month: 'short' })}
+                             </span>
+                             <div className="flex items-center gap-1 group-hover:opacity-100 opacity-0 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md hover:bg-white shadow-sm border border-transparent hover:border-border">
+                                  <Edit2 className="h-3 w-3 text-muted-foreground" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md hover:bg-rose-50 hover:text-rose-600 shadow-sm border border-transparent hover:border-rose-100" onClick={() => setDeleteId(expense.id)}>
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                             </div>
+                           </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
-      {showForm ? (
-        /* Add/Edit Form */
-        <div className="flex-1 overflow-y-auto px-4 py-6 hide-scrollbar">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Title */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Title/Item Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => {
-                  setFormData({ ...formData, title: e.target.value });
-                  if (errors.title) setErrors({ ...errors, title: "" });
-                }}
-                placeholder="e.g., Groceries, Phone, Clothes, etc."
-                className={`w-full px-4 py-3 rounded-xl border ${
-                  errors.title
-                    ? "border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20"
-                    : "border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
-                } text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500`}
-              />
-              {errors.title && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  {errors.title}
-                </p>
-              )}
-            </div>
-
-            {/* Category */}
-            <div className="relative z-10">
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Category <span className="text-red-500">*</span>
-              </label>
-              <Autocomplete
-                value={formData.category}
-                onValueChange={(value) => {
-                  setFormData({ ...formData, category: value });
-                  if (errors.category) setErrors({ ...errors, category: "" });
-                }}
-                options={categories}
-                placeholder="Select category"
-                className={
-                  errors.category ? "border-red-300 dark:border-red-700" : ""
-                }
-              />
-              {errors.category && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  {errors.category}
-                </p>
-              )}
-            </div>
-
-            {/* Amount */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Amount <span className="text-red-500">*</span>
-              </label>
-              <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <DollarSign className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={formData.amount}
-                  onChange={(e) => {
-                    setFormData({
-                      ...formData,
-                      amount: e.target.value.replace(/[^0-9.]/g, ""),
-                    });
-                    if (errors.amount) setErrors({ ...errors, amount: "" });
-                  }}
-                  placeholder="Enter amount"
-                  className={`flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
-                    errors.amount ? "text-red-600 dark:text-red-400" : ""
-                  }`}
-                />
-              </div>
-              {errors.amount && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  {errors.amount}
-                </p>
-              )}
-            </div>
-
-            {/* GST Rate */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                GST Rate (%)
-              </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={formData.gst_rate}
-                onChange={(e) => {
-                  setFormData({
-                    ...formData,
-                    gst_rate: e.target.value.replace(/[^0-9.]/g, ""),
-                  });
-                }}
-                placeholder="Enter GST rate (e.g., 18)"
-                className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
-              />
-              {formData.amount &&
-                formData.gst_rate &&
-                parseFloat(formData.gst_rate) > 0 && (
-                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        Base Amount:
-                      </span>
-                      <span className="font-semibold text-[#111827] dark:text-white">
-                        ₹{parseFloat(formData.amount).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        GST ({formData.gst_rate}%):
-                      </span>
-                      <span className="font-semibold text-[#111827] dark:text-white">
-                        ₹
-                        {(
-                          (parseFloat(formData.amount) *
-                            parseFloat(formData.gst_rate || "0")) /
-                          100
-                        ).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
-                      <span className="font-semibold text-[#111827] dark:text-white">
-                        Total Amount:
-                      </span>
-                      <span className="font-bold text-lg text-blue-600 dark:text-blue-400">
-                        ₹
-                        {(
-                          parseFloat(formData.amount) +
-                          (parseFloat(formData.amount) *
-                            parseFloat(formData.gst_rate || "0")) /
-                            100
-                        ).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-            </div>
-
-            {/* Date */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Date <span className="text-red-500">*</span>
-              </label>
-              <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <Calendar className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
-                <input
-                  type="date"
-                  value={formData.expense_date}
-                  onChange={(e) => {
-                    setFormData({ ...formData, expense_date: e.target.value });
-                    if (errors.expense_date)
-                      setErrors({ ...errors, expense_date: "" });
-                  }}
-                  className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white"
-                />
-              </div>
-              {errors.expense_date && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  {errors.expense_date}
-                </p>
-              )}
-            </div>
-
-            {/* Payment Method */}
-            <div className="relative z-10">
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Payment Method
-              </label>
-              <Autocomplete
-                value={formData.payment_method}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    payment_method: value as typeof formData.payment_method,
-                  })
-                }
-                options={paymentMethods}
-                placeholder="Select payment method"
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Description
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Add a description"
-                rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500 resize-none"
-              />
-            </div>
-
-            {/* Reference Number */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Reference Number
-              </label>
-              <input
-                type="text"
-                value={formData.reference_number}
-                onChange={(e) =>
-                  setFormData({ ...formData, reference_number: e.target.value })
-                }
-                placeholder="Transaction reference (optional)"
-                className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
-              />
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Notes
-              </label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
-                placeholder="Additional notes (optional)"
-                rows={2}
-                className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500 resize-none"
-              />
-            </div>
-
-            {errors.submit && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                <p className="text-sm text-red-600 dark:text-red-400">
-                  {errors.submit}
-                </p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
-                isSubmitting
-                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-                  : "bg-[#22C55E] dark:bg-green-600 text-white hover:bg-[#16A34A] dark:hover:bg-green-700 shadow-lg hover:shadow-xl active:scale-95"
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  {editingId ? "Update Expense" : "Add Expense"}
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-      ) : (
-        /* Expense List */
-        <div className="flex-1 flex flex-col">
-          {/* Search and Filter */}
-          <div className="px-4 py-4 space-y-3 border-b border-[#F3F4F6] dark:border-gray-800 bg-white dark:bg-gray-900">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9CA3AF] dark:text-gray-500" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search expenses..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
-              />
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-              <button
-                onClick={() => setFilterCategory("all")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                  filterCategory === "all"
-                    ? "bg-[#22C55E] dark:bg-green-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 text-[#374151] dark:text-gray-300"
-                }`}
-              >
-                All
-              </button>
-              {categories.map((cat) => (
-                <button
-                  key={cat.value}
-                  onClick={() => setFilterCategory(cat.value)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                    filterCategory === cat.value
-                      ? "bg-[#22C55E] dark:bg-green-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 text-[#374151] dark:text-gray-300"
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* List */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 hide-scrollbar">
-            {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-[#22C55E] dark:text-green-400" />
-              </div>
-            ) : filteredExpenses.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <TrendingDown className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-                <p className="text-gray-500 dark:text-gray-400 font-medium mb-2">
-                  No expenses or purchases found
-                </p>
-                <p className="text-sm text-gray-400 dark:text-gray-500">
-                  Add your first expense or purchase
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredExpenses.map((expense) => (
-                  <div
-                    key={expense.id}
-                    className="bg-white dark:bg-gray-800 border border-[#E5E7EB] dark:border-gray-700 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Tag className="w-4 h-4 text-[#9CA3AF] dark:text-gray-500" />
-                          <h3 className="text-base font-bold text-[#111827] dark:text-white">
-                            {expense.title || expense.category}
-                          </h3>
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-[#6B7280] dark:text-gray-400">
-                            {expense.category.charAt(0).toUpperCase() +
-                              expense.category.slice(1)}
-                          </span>
-                        </div>
-                        <p className="text-lg font-bold text-red-600 dark:text-red-400 mb-1">
-                          {formatAmount(expense.amount)}
-                        </p>
-                        <div className="flex items-center gap-3 text-xs text-[#6B7280] dark:text-gray-400 mb-2">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>{formatDate(expense.expense_date)}</span>
-                          </div>
-                          <span>•</span>
-                          <span className="capitalize">
-                            {expense.payment_method.replace("_", " ")}
-                          </span>
-                        </div>
-                        {expense.description && (
-                          <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-2">
-                            {expense.description}
-                          </p>
-                        )}
-                        {expense.notes && (
-                          <p className="text-xs text-[#9CA3AF] dark:text-gray-500 mt-1 italic">
-                            {expense.notes}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 ml-3">
-                        <button
-                          onClick={() => handleEdit(expense)}
-                          className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all duration-200"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(expense.id)}
-                          className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <DeleteConfirmModal 
+        isOpen={!!deleteId} 
+        onClose={() => setDeleteId(null)} 
+        onConfirm={handleDelete} 
+        title="Nullify Archive Entry"
+        message="This will permanently delete the liquidity outflow record from your archive cluster. Operation is irreversible."
+      />
     </div>
   );
 }

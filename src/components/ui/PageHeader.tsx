@@ -1,68 +1,63 @@
 import React from "react";
-import { ArrowLeft, Menu } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { cn } from "../../lib/utils";
+import Button from "./Button";
 
 interface PageHeaderProps {
   title: string;
+  subtitle?: string;
   showBack?: boolean;
   onBackClick?: () => void;
-  showMenu?: boolean;
-  onMenuClick?: () => void;
   rightAction?: React.ReactNode;
+  className?: string;
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({
   title,
-  showBack = true,
+  subtitle,
+  showBack = false,
   onBackClick,
-  showMenu = false,
-  onMenuClick,
   rightAction,
+  className = "",
 }) => {
   const navigate = useNavigate();
 
-  const handleBack = () => {
-    if (onBackClick) {
-      onBackClick();
-    } else {
-      navigate(-1);
-    }
-  };
-
   return (
-    <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-4 py-4 flex items-center justify-between transition-colors shadow-sm">
-      <div className="flex items-center gap-3">
-        {showMenu && (
-          <button
-            onClick={onMenuClick}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all active:scale-95"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        )}
-        
-        {showBack && !showMenu && (
-          <button
-            onClick={handleBack}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all active:scale-95"
-            aria-label="Go back"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-        )}
-        
-        <h1 className="text-lg font-bold text-gray-900 dark:text-white tracking-tight truncate max-w-[200px]">
-          {title}
-        </h1>
-      </div>
-
-      {rightAction && (
-        <div className="flex items-center">
-          {rightAction}
+    <header className={cn(
+      "sticky top-0 z-30 flex flex-col gap-2 bg-background/80 backdrop-blur-md border-b px-4 py-8 sm:px-6 sm:py-10 transition-colors duration-300",
+      className
+    )}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          {showBack && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-ml-2 h-9 w-9 text-muted-foreground hover:text-foreground"
+              onClick={onBackClick || (() => navigate(-1))}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+          )}
+          <div className="flex flex-col min-w-0">
+            <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tighter uppercase tracking-[0.2em] truncate">
+              {title}
+            </h1>
+            {subtitle && (
+              <p className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-1 truncate">
+                {subtitle}
+              </p>
+            )}
+          </div>
         </div>
-      )}
-    </div>
+        {rightAction && (
+          <div className="flex items-center shrink-0">
+            {rightAction}
+          </div>
+        )}
+      </div>
+    </header>
   );
 };
 

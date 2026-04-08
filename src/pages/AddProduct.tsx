@@ -1,309 +1,428 @@
-import React, { useState, useMemo } from "react";
-import {
-  Package,
-  Search,
-  ShoppingCart,
-  Banknote,
-  Boxes,
-  Plus,
-  Edit2,
-  Trash2,
-  Tag,
-  AlertCircle
+import { useState, useEffect, useMemo } from "react";
+import { 
+  Package, 
+  Plus, 
+  Search, 
+  Trash2, 
+  Edit2, 
+  Tag, 
+  Inbox, 
+  ArrowUpRight, 
+  Filter,
+  Layers,
+  ChevronRight,
+  TrendingUp,
+  RotateCcw,
+  Barcode,
+  Hash,
+  AlertTriangle,
+  FileText,
+  Percent,
+  CheckCircle2,
+  Calendar,
+  Layers3,
+  Box,
+  ShieldCheck,
+  Zap,
+  Activity
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from "../hooks/useProducts";
-import DeleteConfirmModal from "../components/DeleteConfirmModal";
-import PageContainer from "../components/ui/PageContainer";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { productSchema, type ProductFormValues } from "../lib/validationSchema";
+import api from "../utils/api";
+
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { Card, CardContent } from "../components/ui/card";
 import Badge from "../components/ui/Badge";
-import type { Product } from "../types/api";
+import EmptyState from "../components/ui/EmptyState";
+import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { cn } from "../lib/utils";
+
+type Category = {
+  id: number;
+  name: string;
+};
+
+type Product = {
+  id: number;
+  name: string;
+  sku?: string;
+  barcode?: string;
+  brand?: string;
+  category_id: number;
+  category_name?: string;
+  selling_price: number;
+  stock_quantity: number;
+  unit: string;
+};
 
 export default function AddProduct() {
   const navigate = useNavigate();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "",
-    selling_price: "",
-    purchase_price: "",
-    stock_quantity: "",
-    tax_rate: "0",
-    unit: "PCS"
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema) as any,
+    defaultValues: {
+      name: "",
+      sku: "",
+      barcode: "",
+      brand: "",
+      categoryId: "" as any,
+      sellingPrice: 0,
+      purchasePrice: 0,
+      discount: 0,
+      stockQuantity: 0,
+      lowStockAlert: 5,
+      unit: "pcs",
+      taxRate: 0,
+      description: "",
+      status: "active",
+    }
   });
 
-  const { data: products = [], isLoading } = useProducts();
-  const createMutation = useCreateProduct();
-  const updateMutation = useUpdateProduct();
-  const deleteMutation = useDeleteProduct();
+  const watchStatus = watch("status");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    const newErrors: Record<string, string> = {};
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
+  }, []);
 
-    const trimmedName = formData.name.trim();
-    if (!trimmedName) newErrors.name = "Product name is required.";
-
-    const sellPrice = parseFloat(formData.selling_price);
-    if (!formData.selling_price || isNaN(sellPrice) || sellPrice < 0) {
-      newErrors.selling_price = "Selling price must be a valid positive number.";
-    }
-
-    const buyPrice = parseFloat(formData.purchase_price);
-    if (formData.purchase_price && (isNaN(buyPrice) || buyPrice < 0)) {
-      newErrors.purchase_price = "Purchase price must be a valid positive number.";
-    }
-
-    const stock = Number(formData.stock_quantity);
-    if (formData.stock_quantity && (isNaN(stock) || !Number.isInteger(stock) || stock < 0)) {
-      newErrors.stock_quantity = "Stock quantity must be a whole positive number.";
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    const payload = {
-      ...formData,
-      name: trimmedName,
-      selling_price: sellPrice || 0,
-      purchase_price: buyPrice || 0,
-      stock_quantity: stock || 0,
-      tax_rate: parseFloat(formData.tax_rate) || 0,
-    };
-
+  const fetchProducts = async () => {
     try {
-      if (editingId) {
-        await updateMutation.mutateAsync({ id: editingId, ...payload });
-      } else {
-        await createMutation.mutateAsync(payload);
+      setLoading(true);
+      const response = await api.get("/products");
+      if (response.data.success) {
+        setProducts(response.data.data);
       }
-      resetForm();
-    } catch (error: any) {
-      console.error("Failed to save product:", error);
-      setErrors({ submit: error.response?.data?.message || "Failed to save data to server." });
+    } catch (error) {
+      console.error("Registry fetch failure:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      category: "",
-      selling_price: "",
-      purchase_price: "",
-      stock_quantity: "",
-      tax_rate: "0",
-      unit: "PCS"
-    });
-    setEditingId(null);
-    setShowForm(false);
-    setErrors({});
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get("/categories");
+      if (response.data.success) {
+        setCategories(response.data.data);
+      }
+    } catch (error) {
+      console.error("Sector fetch failure:", error);
+    }
   };
 
-  const handleEdit = (product: Product) => {
-    setFormData({
-      name: product.name,
-      category: product.category || "",
-      selling_price: product.selling_price.toString(),
-      purchase_price: (product as any).purchase_price?.toString() || "",
-      stock_quantity: product.stock_quantity.toString(),
-      tax_rate: product.tax_rate.toString(),
-      unit: product.unit || "PCS",
-    });
-    setEditingId(product.id);
-    setShowForm(true);
+  const onSubmit = async (data: ProductFormValues) => {
+    try {
+      await api.post("/products", data);
+      reset();
+      setShowForm(false);
+      fetchProducts();
+    } catch (error) {
+      console.error("Registry commit failure:", error);
+    }
   };
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => 
+    return products.filter(p => 
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.category?.toLowerCase().includes(searchQuery.toLowerCase())
+      (p.sku || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [products, searchQuery]);
 
-  const formatAmount = (v: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
+  const stats = useMemo(() => {
+    const totalValue = products.reduce((acc, p) => acc + (p.selling_price * p.stock_quantity), 0);
+    const lowStock = products.filter(p => p.stock_quantity <= 5).length;
+    return { totalValue, lowStock };
+  }, [products]);
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
 
   return (
-    <PageContainer>
+    <div className="flex-1 flex flex-col min-h-screen bg-background pb-32 overflow-x-hidden theme-transition uppercase">
       <PageHeader
-        title={showForm ? (editingId ? "Edit Product" : "New Item") : "Inventory Management"}
-        showBack={true}
-        onBackClick={showForm ? resetForm : () => navigate(-1)}
+        title={showForm ? "Initialize Asset Profile" : "Registry: Assets"}
+        subtitle={showForm ? "Configure Commercial Asset Metadata" : "Global Strategic Inventory & Catalogue Hub"}
+        showBack={showForm}
+        onBackClick={() => setShowForm(false)}
         rightAction={
           !showForm && (
-            <Button size="icon" onClick={() => setShowForm(true)} className="rounded-xl shadow-lg shadow-green-500/20">
-              <Plus className="w-5 h-5" />
+            <Button size="sm" onClick={() => setShowForm(true)} className="rounded-md h-9 uppercase tracking-widest text-[10px] font-black h-9 shadow-lg shadow-primary/10">
+              <Plus className="w-3.5 h-3.5 mr-2" /> REGISTER ASSET
             </Button>
           )
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 py-8 space-y-8 pb-32 custom-scrollbar">
+      <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full space-y-12">
+        {!showForm && (
+           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
+              <Card className="border bg-card shadow-sm pointer-events-auto p-6 flex flex-col justify-between h-32 hover:border-emerald-200 transition-all group overflow-hidden relative">
+                 <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000 text-emerald-500">
+                    <TrendingUp size={100} />
+                 </div>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 opacity-60">Consolidated Valuation</span>
+                 <div className="flex items-end justify-between relative z-10">
+                    <span className="text-3xl font-black text-emerald-700 tracking-tighter">{formatAmount(stats.totalValue)}</span>
+                    <Badge variant="outline" className="text-[9px] font-black h-5 uppercase tracking-widest bg-emerald-50 text-emerald-600 border-emerald-100 italic">VALUATION_ACTIVE</Badge>
+                 </div>
+              </Card>
+              <Card className="border bg-card shadow-sm pointer-events-auto p-6 flex flex-col justify-between h-32 hover:border-rose-200 transition-all group overflow-hidden relative">
+                 <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform duration-1000 text-rose-500">
+                    <AlertTriangle size={100} />
+                 </div>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 opacity-60">Procurement Priority</span>
+                 <div className="flex items-end justify-between relative z-10">
+                    <span className="text-3xl font-black text-rose-700 tracking-tighter">{stats.lowStock} NODES</span>
+                    <Badge variant="outline" className="text-[9px] font-black h-5 uppercase tracking-widest bg-rose-50 text-rose-600 border-rose-100 italic">LOW_VOLUME_DETECTED</Badge>
+                 </div>
+              </Card>
+           </section>
+        )}
+
         {showForm ? (
-          <form id="product-form" onSubmit={handleSubmit} className="space-y-8 animate-in slide-in-from-bottom-4 duration-300">
-            <div className="bg-white dark:bg-gray-800 p-8 rounded-[40px] border-2 border-gray-100 dark:border-gray-800 shadow-xl space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Identity *</label>
-                <div className="relative">
-                   <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
-                   <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="Product / Service Name" className="pl-12 h-14" required />
-                </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-12 pb-20">
+            
+            {/* Section 1: Identification */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                 <div className="w-1.5 h-4 bg-primary rounded-full transition-all group-hover:h-6" />
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Principal Identification</h3>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Sell Price *</label>
-                  <div className="relative">
-                    <ShoppingCart className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
-                    <Input value={formData.selling_price} onChange={(e) => setFormData({...formData, selling_price: e.target.value})} placeholder="0.00" className="pl-12 h-14" required />
+              <Card className="border shadow-sm pointer-events-auto bg-card">
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <Input label="Registry Descriptor" placeholder="e.g. Premium Cotton Textile" {...register("name")} error={errors.name?.message} leftIcon={<Box className="w-4 h-4" />} />
+                    <Input label="Manufacturer Node" placeholder="e.g. NIKE_INDUSTRIES" {...register("brand")} error={errors.brand?.message} leftIcon={<Zap className="w-4 h-4" />} />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Buy Price</label>
-                  <div className="relative">
-                    <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input value={formData.purchase_price} onChange={(e) => setFormData({...formData, purchase_price: e.target.value})} placeholder="0.00" className="pl-12 h-14" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t pt-8">
+                    <div className="space-y-1.5 text-left">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 opacity-60">Sectoral Node</label>
+                       <select 
+                         {...register("categoryId")}
+                         className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-sm outline-none"
+                       >
+                         <option value="">SELECT_HIERARCHY...</option>
+                         {categories.map(c => <option key={c.id} value={c.id} className="text-foreground uppercase">{c.name}</option>)}
+                       </select>
+                       {errors.categoryId?.message && <p className="text-[10px] font-black text-destructive uppercase tracking-widest mt-1.5 ml-1">{(errors.categoryId.message as any)}</p>}
+                    </div>
+                    <Input label="Unit of Protocol (UoM)" placeholder="PCS, KGS, MTR" {...register("unit")} error={errors.unit?.message} leftIcon={<Layers className="w-4 h-4" />} />
                   </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
-                  <Input value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} placeholder="e.g. Hardware" className="h-14" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Initial Stock</label>
-                  <div className="relative">
-                    <Boxes className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
-                    <Input value={formData.stock_quantity} onChange={(e) => setFormData({...formData, stock_quantity: e.target.value})} placeholder="Qty" className="pl-12 h-14" />
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {Object.keys(errors).length > 0 && (
-              <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-sm">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>Please fix the following errors:</span>
-                </div>
-                <ul className="text-xs text-rose-600 dark:text-rose-400 font-medium list-disc pl-5">
-                  {Object.values(errors).map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                </ul>
+            {/* Section 2: Logistics */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                 <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Tracking & Logistics Hub</h3>
               </div>
-            )}
+              <Card className="border shadow-sm pointer-events-auto bg-card">
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <Input label="SKU Index" placeholder="UID: ARCHIVE_C_001" leftIcon={<Hash className="w-4 h-4" />} {...register("sku")} error={errors.sku?.message} />
+                    <Input label="Barcode Identification" placeholder="SCAN_IDENTIFIER" leftIcon={<Barcode className="w-4 h-4" />} {...register("barcode")} error={errors.barcode?.message} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t pt-8">
+                    <Input label="Current Stock Volume" type="number" leftIcon={<Inbox className="w-4 h-4" />} {...register("stockQuantity")} error={errors.stockQuantity?.message} />
+                    <Input label="Interruption Threshold (Low)" type="number" leftIcon={<AlertTriangle className="w-4 h-4" />} {...register("lowStockAlert")} error={errors.lowStockAlert?.message} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-            <div className="pt-4">
-               <Button 
-                type="submit" 
-                isLoading={createMutation.isPending || updateMutation.isPending} 
-                className="w-full h-18 rounded-[32px] shadow-2xl shadow-green-500/25 font-black uppercase text-sm tracking-[0.2em] py-6"
-               >
-                 {editingId ? "COMMIT CHANGES" : "ADD TO CATALOG"}
-               </Button>
+            {/* Section 3: Financials */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                 <div className="w-1.5 h-4 bg-emerald-500 rounded-full" />
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Fiscal Calibration</h3>
+              </div>
+              <Card className="border shadow-sm pointer-events-auto bg-card">
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                    <Input label="Procurement Valuation" type="number" leftIcon={<RotateCcw className="w-4 h-4" />} {...register("purchasePrice")} error={errors.purchasePrice?.message} />
+                    <Input label="Strategic Sale Price" type="number" leftIcon={<TrendingUp className="w-4 h-4" />} {...register("sellingPrice")} error={errors.sellingPrice?.message} />
+                    <Input label="Margin Offset (%)" type="number" leftIcon={<Percent className="w-4 h-4" />} {...register("discount")} error={errors.discount?.message} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Section 4: Metadata */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                 <div className="w-1.5 h-4 bg-zinc-900 rounded-full" />
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Supplementary Metadata</h3>
+              </div>
+              <Card className="border shadow-sm pointer-events-auto bg-card overflow-hidden">
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+                     <div className="space-y-2">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 opacity-60">Registry Life-Cycle Status</label>
+                       <div className="flex items-center gap-4">
+                          <button 
+                            type="button" 
+                            onClick={() => setValue('status', 'active')} 
+                            className={cn(
+                              "flex-1 h-11 rounded-md border text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300",
+                              watchStatus === 'active' 
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm ring-1 ring-emerald-500/20" 
+                                : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50"
+                            )}
+                          >
+                             <CheckCircle2 className="w-3.5 h-3.5" /> ACTIVE_FLOW
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={() => setValue('status', 'inactive')} 
+                            className={cn(
+                               "flex-1 h-11 rounded-md border text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300",
+                               watchStatus === 'inactive' 
+                                 ? "bg-rose-50 text-rose-700 border-rose-100 shadow-sm ring-1 ring-rose-500/20" 
+                                 : "bg-muted/30 border-input text-muted-foreground hover:bg-muted/50"
+                             )}
+                          >
+                             ARCHIVED_STATE
+                          </button>
+                       </div>
+                     </div>
+                     <Input label="Registry Initialization" type="date" leftIcon={<Calendar className="w-4 h-4" />} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 opacity-60">Functional Specifications</label>
+                    <textarea 
+                      {...register("description")}
+                      className="flex min-h-[140px] w-full rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-sm outline-none"
+                      placeholder="Detailed architectural specifications for this asset node..."
+                    />
+                  </div>
+                </CardContent>
+                <div className="p-8 bg-muted/10 border-t flex flex-col sm:flex-row gap-4">
+                   <Button type="button" variant="outline" className="flex-1 h-12 uppercase font-black tracking-widest text-[11px]" onClick={() => setShowForm(false)}>DISCARD DRAFT</Button>
+                   <Button type="submit" isLoading={isSubmitting} className="flex-1 h-12 uppercase font-black tracking-widest text-[11px] shadow-2xl shadow-primary/20">COMMIT ASSET TO REGISTRY</Button>
+                </div>
+              </Card>
+            </div>
+            
+            <div className="flex items-center justify-center gap-2 opacity-30 pt-4">
+               <ShieldCheck size={14} className="text-primary" />
+               <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em]">ASSET_NODES_ENCRYPTED: V2.4</span>
             </div>
           </form>
         ) : (
-          <div className="space-y-8">
-            <div className="relative group">
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-green-500 transition-colors" />
-              <Input 
-                value={searchQuery} 
-                onChange={(e) => setSearchQuery(e.target.value)} 
-                placeholder="FIND ITEM OR CATEGORY..." 
-                className="pl-14 h-16 rounded-[32px] bg-gray-50 border-none shadow-inner text-sm font-bold uppercase tracking-widest" 
-              />
+          <div className="space-y-12">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+               <Input 
+                 placeholder="Search registry catalogue (Name, SKU, Brand)..." 
+                 value={searchQuery} 
+                 onChange={(e) => setSearchQuery(e.target.value)} 
+                 leftIcon={<Search className="w-4 h-4" />}
+                 className="h-11 shadow-sm border-muted-foreground/10"
+               />
+               <Button variant="outline" className="h-11 px-8 rounded-md uppercase font-black tracking-widest text-[10px] w-full sm:w-auto" onClick={() => navigate("/products/categories")}>
+                 <Layers3 className="w-4 h-4 mr-2" /> SECTORAL MAPPING
+               </Button>
             </div>
 
-            {isLoading ? (
-               <div className="grid gap-6">
-                 {[1,2,3].map(i => <div key={i} className="h-32 bg-gray-50 dark:bg-gray-800/50 animate-pulse rounded-[40px]" />)}
-               </div>
-            ) : filteredProducts.length === 0 ? (
-               <div className="py-24 text-center space-y-6">
-                  <div className="w-24 h-24 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto">
-                    <Package className="w-12 h-12 text-gray-200" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-black text-gray-400 uppercase tracking-[0.3em]">Vault is empty</p>
-                    <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">Add your first product to start billing</p>
-                  </div>
-                  <Button onClick={() => setShowForm(true)} variant="secondary" className="rounded-2xl px-10 h-14 border-2 border-dashed font-black uppercase text-[10px] tracking-widest">Add New Item</Button>
-               </div>
-            ) : (
-              <div className="grid gap-6">
-                {filteredProducts.map(product => (
-                  <Card key={product.id} className="group rounded-[40px] border-2 border-gray-50 dark:border-gray-800/50 hover:border-green-500/20 hover:shadow-2xl transition-all duration-500 bg-white dark:bg-gray-800 overflow-hidden">
-                    <CardContent className="p-8 flex flex-col sm:flex-row items-center gap-8">
-                      <div className="w-20 h-20 rounded-3xl bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center text-gray-400 font-black text-2xl group-hover:bg-green-500/10 group-hover:text-green-500 transition-all duration-500 group-hover:rotate-12">
-                        {product.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 text-center sm:text-left min-w-0 space-y-3">
-                        <div>
-                          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mb-1">
-                             <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight truncate">{product.name}</h3>
-                             {product.category && (
-                               <Badge variant="primary" className="text-[10px] px-3 py-1 bg-blue-50 text-blue-600 dark:bg-blue-900/20 rounded-full font-black uppercase tracking-widest shadow-sm">
-                                  {product.category}
-                               </Badge>
-                             )}
-                          </div>
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{product.unit || "PCS"} UNIT</p>
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-8 pt-2">
-                           <div className="space-y-1">
-                              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Rate</p>
-                              <p className="text-xl font-black text-green-500 tracking-tight">{formatAmount(product.selling_price)}</p>
-                           </div>
-                           <div className="space-y-1">
-                              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">In Stock</p>
-                              <div className="flex items-center gap-2">
-                                <p className={`text-xl font-black tracking-tight ${product.stock_quantity < 10 ? "text-rose-500 animate-pulse" : "text-gray-900 dark:text-white"}`}>{product.stock_quantity}</p>
-                                {product.stock_quantity < 10 && <Badge variant="danger" className="text-[8px] px-1.5 py-0 font-black">LOW</Badge>}
-                              </div>
-                           </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-3 justify-center">
-                        <button onClick={() => handleEdit(product)} className="w-12 h-12 rounded-[20px] bg-gray-50 dark:bg-gray-700/50 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-300 flex items-center justify-center active:scale-90">
-                          <Edit2 className="w-5 h-5" />
-                        </button>
-                        <button onClick={() => { setDeletingProduct(product); setDeleteModalOpen(true); }} className="w-12 h-12 rounded-[20px] bg-gray-50 dark:bg-gray-700/50 text-gray-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all duration-300 flex items-center justify-center active:scale-90">
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                 <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.25em]">Asset Registry Feed</p>
+                    <Badge variant="secondary" className="text-[9px] h-5">{filteredProducts.length} NODES_INDEXED</Badge>
+                 </div>
+                 <Activity className="w-4 h-4 text-muted-foreground/40" />
               </div>
-            )}
+
+              {loading ? (
+                <div className="grid gap-3">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="h-24 bg-muted/20 animate-pulse rounded-md border" />
+                  ))}
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <EmptyState 
+                   title="Registry Static" 
+                   description="No asset nodes have been initialized within the commercial catalogue." 
+                   icon={<Package className="h-12 w-12 text-muted-foreground/20" />} 
+                   actionLabel="INITIALIZE ASSET" 
+                   onAction={() => setShowForm(true)} 
+                />
+              ) : (
+                <div className="grid gap-3 animate-in fade-in duration-700">
+                  {filteredProducts.map(product => (
+                    <Card key={product.id} className="group pointer-events-auto hover:border-primary/20 transition-all duration-300 shadow-sm hover:shadow-md bg-card overflow-hidden">
+                      <CardContent className="p-0 flex items-stretch justify-between h-20">
+                        <div className="flex items-center gap-4 px-4 flex-1 min-w-0">
+                          <div className="h-11 w-11 rounded-lg bg-muted border flex items-center justify-center text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary transition-all shadow-sm group-hover:scale-105">
+                            <Package className="h-6 w-6" />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-2">
+                               <h4 className="font-black text-foreground uppercase tracking-widest text-sm truncate">{product.name}</h4>
+                               <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-black uppercase tracking-widest bg-muted/5 opacity-60">UoM: {product.unit}</Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 opacity-60">
+                               <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-none truncate whitespace-nowrap">
+                                 {product.category_name || "GENERAL_NODE"}
+                               </span>
+                               <span className="w-1 h-1 rounded-full bg-border" />
+                               <span className={cn(
+                                 "text-[9px] font-black uppercase tracking-[0.15em] leading-none",
+                                 product.stock_quantity <= 5 ? "text-rose-600" : "text-emerald-600"
+                               )}>
+                                 {product.stock_quantity} UNITS_AVAIL
+                               </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col justify-center items-end px-6 bg-muted/5 group-hover:bg-muted/10 transition-colors border-l text-right shrink-0">
+                           <p className="text-xl font-black text-foreground tracking-tighter leading-none mb-1.5 group-hover:text-primary transition-colors">
+                             {formatAmount(product.selling_price)}
+                           </p>
+                           <div className="flex items-center gap-2">
+                             <span className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-40">VAL_PPU</span>
+                             <div className="flex items-center gap-1 group-hover:opacity-100 opacity-0 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md hover:bg-white shadow-sm border border-transparent hover:border-border">
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md hover:bg-rose-50 hover:text-rose-600 shadow-sm border border-transparent hover:border-rose-100">
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                             </div>
+                           </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
-
-      <DeleteConfirmModal
-        isOpen={deleteModalOpen}
-        onClose={() => { setDeleteModalOpen(false); setDeletingProduct(null); }}
-        onConfirm={() => deletingProduct && deleteMutation.mutate(deletingProduct.id, { onSettled: () => setDeleteModalOpen(false) })}
-        title="Remove Item?"
-        message={`Are you sure you want to remove ${deletingProduct?.name} from your catalog? This will affect historical billing records associated with this item.`}
-        itemName={deletingProduct?.name || ""}
-      />
-    </PageContainer>
+    </div>
   );
 }

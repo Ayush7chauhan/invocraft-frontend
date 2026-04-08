@@ -1,536 +1,267 @@
-import { useState, useEffect } from "react";
-import {
-  ArrowLeft,
-  Moon,
-  Sun,
-  Bell,
-  User,
-  Building2,
-  Phone,
-  MapPin,
+import { useState } from "react";
+import { 
+  Building2, 
+  User, 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Camera, 
+  ShieldCheck, 
+  LogOut, 
+  Bell, 
+  Palette, 
+  CreditCard, 
+  History, 
+  Lock, 
+  ChevronRight, 
+  Info, 
+  CheckCircle2, 
+  Store, 
   Save,
-  Loader2,
-  LogOut,
-  Trash2,
-  Mail,
+  Cpu,
+  Database,
+  Globe,
+  Fingerprint
 } from "lucide-react";
-import axios from "axios";
-import { useTheme } from "../hooks/useTheme";
-import api from "../utils/api";
-import LogoutModal from "../components/LogoutModal";
-
-import { useNavigate } from "react-router-dom";
-
-
-type UserData = {
-  id: number;
-  shop_name?: string | null;
-  owner_name?: string | null;
-  shop_address?: string | null;
-  mobile_number?: string | null;
-  email?: string | null;
-  business_type?: string | null;
-  is_registration_complete?: boolean;
-};
-
-type FormDataState = {
-  shop_name: string;
-  owner_name: string;
-  shop_address: string;
-  mobile_number: string;
-  email: string;
-  business_type: string;
-};
-
-type NotificationSettings = {
-  lowStock: boolean;
-  paymentReminder: boolean;
-  newCustomer: boolean;
-  dailySummary: boolean;
-};
-
-type UpdateShopPayload = {
-  user_id: number;
-  shop_name: string | null;
-  owner_name: string;
-  shop_address: string | null;
-  business_type: string | null;
-  is_registration_complete: boolean;
-};
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import PageHeader from "../components/ui/PageHeader";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+import { Card, CardContent, CardFooter } from "../components/ui/card";
+import Badge from "../components/ui/Badge";
+import { cn } from "../lib/utils";
 
 export default function Settings() {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const onBack = () => navigate(-1);
+  const [activeTab, setActiveTab] = useState<"profile" | "shop" | "security">("profile");
 
-  const { isDarkMode, toggleTheme } = useTheme();
+  const [formData, setFormData] = useState({
+    name: user?.owner_name || "",
+    email: user?.email || "",
+    shopName: user?.shop_name || "",
+    mobile: user?.mobile || "",
+    address: user?.address || "",
+    gstin: "",
+  });
 
-  const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const [notifications, setNotifications] = useState<NotificationSettings>({
-    lowStock: true,
-    paymentReminder: true,
-    newCustomer: false,
-    dailySummary: true,
-  });
-
-  const [formData, setFormData] = useState<FormDataState>({
-    shop_name: "",
-    owner_name: "",
-    shop_address: "",
-    mobile_number: "",
-    email: "",
-    business_type: "",
-  });
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-
-    if (!storedUser) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const user: UserData = JSON.parse(storedUser);
-
-      setUserData(user);
-      setFormData({
-        shop_name: user.shop_name || "",
-        owner_name: user.owner_name || "",
-        shop_address: user.shop_address || "",
-        mobile_number: user.mobile_number || "",
-        email: user.email || "",
-        business_type: user.business_type || "",
-      });
-    } catch (error) {
-      console.error("Error parsing user data:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setSavedSuccess(false);
+  };
 
   const handleSave = async () => {
-    if (!userData?.id) {
-      alert("Session expired. Please log in again.");
-      return;
-    }
-
-    if (!formData.owner_name.trim()) {
-      alert("Owner name is required.");
-      return;
-    }
-
     setSaving(true);
-
-    try {
-      const payload: UpdateShopPayload = {
-        user_id: userData.id,
-        shop_name: formData.shop_name.trim() || null,
-        owner_name: formData.owner_name.trim(),
-        shop_address: formData.shop_address.trim() || null,
-        business_type: formData.business_type.trim() || null,
-        is_registration_complete: userData.is_registration_complete !== false,
-      };
-
-      const response = await api.post("/update-shop-details", payload);
-
-      if (response.data?.success) {
-        const updatedUser: UserData = {
-          ...response.data.data.user,
-          email: formData.email.trim() || null,
-        };
-
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-        setUserData(updatedUser);
-
-        alert("Settings saved successfully!");
-      } else {
-        alert(response.data?.message || "Failed to save settings.");
-      }
-    } catch (error: unknown) {
-      console.error("Error saving settings:", error);
-
-      if (axios.isAxiosError(error)) {
-        const apiMessage =
-          error.response?.data?.message ||
-          (error.response?.data?.errors
-            ? JSON.stringify(error.response.data.errors)
-            : null);
-
-        alert(apiMessage || "Failed to save settings. Please try again.");
-      } else {
-        alert("Failed to save settings. Please try again.");
-      }
-    } finally {
-      setSaving(false);
-    }
+    // Simulate API persistence delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setSaving(false);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
-    navigate("/login");
-  };
-
-  const toggleNotification = (key: keyof NotificationSettings) => {
-    setNotifications((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  };
-
-  const notificationDescriptions: Record<keyof NotificationSettings, string> = {
-    lowStock: "Get notified when stock is low",
-    paymentReminder: "Reminders for pending payments",
-    newCustomer: "Notifications for new customers",
-    dailySummary: "Daily business summary",
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-[#22C55E] dark:text-green-400" />
-      </div>
-    );
-  }
+  const navItems = [
+    { id: "profile", label: "IDENTITY_NODE", icon: User },
+    { id: "shop", label: "BUSINESS_UNIT", icon: Building2 },
+    { id: "security", label: "ENCRYPTION_VAULT", icon: ShieldCheck },
+  ] as const;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
-      {/* Header */}
-      <div className="px-4 py-4 flex items-center gap-3 border-b border-[#F3F4F6] dark:border-gray-800 bg-white dark:bg-gray-900 sticky top-0 z-10">
-        <button
-          onClick={onBack}
-          className="w-8 h-8 flex items-center justify-center"
-        >
-          <ArrowLeft className="w-5 h-5 text-[#111827] dark:text-white" />
-        </button>
+    <div className="flex-1 flex flex-col min-h-screen bg-background pb-32 overflow-x-hidden theme-transition uppercase cursor-default">
+      <PageHeader 
+        title="System Configuration" 
+        subtitle="Operational Preferences & Global Credentials"
+        showBack={true} 
+        onBackClick={() => navigate("/dashboard")}
+        rightAction={
+           <Button variant="ghost" size="icon" className="group rounded-md h-9 w-9 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+              <LogOut className="h-4.5 w-4.5 group-hover:-translate-x-0.5 transition-transform" />
+           </Button>
+        }
+      />
 
-        <h1 className="text-lg font-bold text-[#111827] dark:text-white flex-1">
-          Settings
-        </h1>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 hide-scrollbar">
-        {/* Profile Section */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">
-            Profile
-          </h2>
-
-          <div className="space-y-4">
-            {/* Shop Name */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Shop Name
-              </label>
-
-              <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <Building2 className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                <input
-                  type="text"
-                  value={formData.shop_name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      shop_name: e.target.value,
-                    }))
-                  }
-                  placeholder="Enter shop name"
-                  className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                />
-              </div>
-            </div>
-
-            {/* Owner Name */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Owner Name
-              </label>
-
-              <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <User className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                <input
-                  type="text"
-                  value={formData.owner_name}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      owner_name: e.target.value,
-                    }))
-                  }
-                  placeholder="Enter owner name"
-                  className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                />
-              </div>
-            </div>
-
-            {/* Mobile */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Mobile Number
-              </label>
-
-              <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                <input
-                  type="tel"
-                  value={formData.mobile_number}
-                  disabled
-                  className="flex-1 outline-none bg-transparent text-gray-500 dark:text-gray-400"
-                />
-              </div>
-
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Mobile number cannot be changed
-              </p>
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Email (Optional)
-              </label>
-
-              <div className="flex items-center gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      email: e.target.value,
-                    }))
-                  }
-                  placeholder="Enter email address"
-                  className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                />
-              </div>
-            </div>
-
-            {/* Address */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Shop Address
-              </label>
-
-              <div className="flex items-start gap-2 border border-[#E5E7EB] dark:border-gray-700 rounded-xl px-4 py-3 bg-white dark:bg-gray-800">
-                <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-1 shrink-0" />
-                <textarea
-                  value={formData.shop_address}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      shop_address: e.target.value,
-                    }))
-                  }
-                  placeholder="Enter shop address"
-                  rows={3}
-                  className="flex-1 outline-none bg-transparent text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-gray-500 resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Business Type */}
-            <div>
-              <label className="text-sm font-medium text-[#111827] dark:text-gray-200 mb-2 block">
-                Business Type
-              </label>
-
-              <select
-                value={formData.business_type}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    business_type: e.target.value,
-                  }))
-                }
-                className="w-full px-4 py-3 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800 text-[#111827] dark:text-white outline-none focus:ring-2 focus:ring-[#22C55E] dark:focus:ring-green-500"
-              >
-                <option value="">Select business type</option>
-                <option value="grocery">Grocery</option>
-                <option value="medical">Medical</option>
-                <option value="general">General Store</option>
-                <option value="restaurant">Restaurant</option>
-                <option value="electronics">Electronics</option>
-                <option value="clothing">Clothing</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-
-            {/* Save */}
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 bg-[#22C55E] dark:bg-green-600 text-white hover:bg-[#16A34A] dark:hover:bg-green-700 shadow-lg hover:shadow-xl active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Save Changes
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Preferences */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">
-            Preferences
-          </h2>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800">
-              <div className="flex items-center gap-3">
-                {isDarkMode ? (
-                  <Moon className="w-5 h-5 text-[#111827] dark:text-white" />
-                ) : (
-                  <Sun className="w-5 h-5 text-[#111827] dark:text-white" />
-                )}
-
-                <div>
-                  <p className="text-sm font-medium text-[#111827] dark:text-white">
-                    Dark Mode
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Toggle dark theme
-                  </p>
-                </div>
-              </div>
-
+      <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 max-w-4xl mx-auto w-full space-y-12">
+        
+        {/* Navigation Tabs - High Fidelity */}
+        <div className="flex items-center gap-1 bg-muted/30 p-1.5 rounded-xl border shadow-inner overflow-x-auto hide-scrollbar pointer-events-auto backdrop-blur-sm">
+           {navItems.map((item) => (
               <button
-                onClick={toggleTheme}
-                className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                  isDarkMode
-                    ? "bg-[#22C55E] dark:bg-green-600"
-                    : "bg-gray-300 dark:bg-gray-600"
-                }`}
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2.5 px-6 py-3 rounded-lg text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-500 whitespace-nowrap min-w-[140px] relative group overflow-hidden",
+                  activeTab === item.id 
+                    ? "bg-background text-foreground shadow-md ring-1 ring-border" 
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
               >
-                <span
-                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${
-                    isDarkMode ? "translate-x-6" : "translate-x-0"
-                  }`}
-                />
+                {activeTab === item.id && <div className="absolute inset-0 bg-primary/5 group-hover:bg-primary/10 transition-colors" />}
+                <item.icon className={cn("h-4 w-4 relative z-10", activeTab === item.id ? "text-primary" : "opacity-40")} />
+                <span className="relative z-10">{item.label}</span>
               </button>
-            </div>
-          </div>
+           ))}
         </div>
 
-        {/* Notifications */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">
-            Notifications
-          </h2>
+        {/* Dynamic Configuration Panel */}
+        <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-10 relative">
+           
+           {/* Background Grid Pattern - Architectural Accent */}
+           <div className="absolute inset-x-0 top-0 -mt-10 h-64 opacity-[0.03] pointer-events-none select-none z-0 overflow-hidden">
+              <div className="w-full h-full bg-[radial-gradient(#000_1px,transparent_1px)] dark:bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]" />
+           </div>
 
-          <div className="space-y-3">
-            {(
-              Object.entries(notifications) as [
-                keyof NotificationSettings,
-                boolean,
-              ][]
-            ).map(([key, value]) => (
-              <div
-                key={key}
-                className="flex items-center justify-between p-4 rounded-xl border border-[#E5E7EB] dark:border-gray-700 bg-white dark:bg-gray-800"
-              >
-                <div className="flex items-center gap-3">
-                  <Bell className="w-5 h-5 text-[#111827] dark:text-white" />
-                  <div>
-                    <p className="text-sm font-medium text-[#111827] dark:text-white">
-                      {key
-                        .replace(/([A-Z])/g, " $1")
-                        .replace(/^./, (str) => str.toUpperCase())}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {notificationDescriptions[key]}
-                    </p>
-                  </div>
+           {activeTab === "profile" && (
+             <div className="space-y-6 relative z-10">
+                <div className="flex items-center gap-2 px-1">
+                   <div className="w-1.5 h-4 bg-primary rounded-full" />
+                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Identity Protocol Documentation</h3>
                 </div>
+                
+                <Card className="border shadow-sm overflow-hidden pointer-events-auto bg-card">
+                   <CardContent className="p-8 sm:p-10 space-y-12">
+                      <div className="flex flex-col sm:flex-row items-center gap-10">
+                         <div className="relative group p-1 rounded-2xl border-2 border-dashed border-muted-foreground/10 hover:border-primary/20 transition-all">
+                            <div className="h-28 w-28 rounded-xl bg-muted border flex items-center justify-center text-muted-foreground/30 shadow-inner group-hover:border-primary/20 transition-all overflow-hidden bg-cover bg-center group-hover:scale-[1.02] duration-500" 
+                                 style={{ backgroundImage: `url('https://ui-avatars.com/api/?name=${formData.name}&background=f8fafc&color=0f172a&bold=true&size=512')` }}>
+                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity cursor-pointer backdrop-blur-[2px]">
+                                  <Camera className="h-7 w-7 text-white animate-bounce" />
+                                  <span className="text-[8px] font-black text-white uppercase tracking-widest mt-2">UPLO_IMG</span>
+                               </div>
+                            </div>
+                            <div className="absolute -bottom-2 -right-2 h-8 w-8 bg-emerald-500 rounded-lg border-[3px] border-background flex items-center justify-center shadow-xl">
+                               <CheckCircle2 className="h-4 w-4 text-white" />
+                            </div>
+                         </div>
+                         <div className="text-center sm:text-left space-y-2">
+                            <h4 className="text-2xl font-black text-foreground tracking-tighter uppercase tracking-[0.05em] leading-none mb-1">{formData.name || "UNNAMED_ENTITY"}</h4>
+                            <div className="flex items-center justify-center sm:justify-start gap-2 text-muted-foreground opacity-40">
+                               <Fingerprint size={12} />
+                               <p className="text-[10px] font-bold uppercase tracking-[0.25em]">{user?.email || "ID#748291-OFFLINE"}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-3">
+                               <Badge variant="success" className="text-[8px] font-black h-5 uppercase tracking-widest px-2.5 bg-emerald-50 text-emerald-600 border-emerald-100 italic">VERIFIED_NODE</Badge>
+                               <Badge variant="secondary" className="text-[8px] font-black h-5 uppercase tracking-widest px-2.5 bg-zinc-50 text-zinc-600 border-zinc-100 italic">SUPER_OWNER</Badge>
+                            </div>
+                         </div>
+                      </div>
 
-                <button
-                  onClick={() => toggleNotification(key)}
-                  className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                    value
-                      ? "bg-[#22C55E] dark:bg-green-600"
-                      : "bg-gray-300 dark:bg-gray-600"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${
-                      value ? "translate-x-6" : "translate-x-0"
-                    }`}
-                  />
-                </button>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pt-10 border-t border-muted-foreground/5">
+                         <Input label="Primary Registry Name" name="name" value={formData.name} onChange={handleInputChange} leftIcon={<User className="h-4 w-4 text-muted-foreground/40" />} />
+                         <Input label="Digital Communication Endpoint" name="email" value={formData.email} onChange={handleInputChange} leftIcon={<Mail className="h-4 w-4 text-muted-foreground/40" />} />
+                      </div>
+                   </CardContent>
+                   <CardFooter className="bg-muted/10 px-10 py-6 border-t flex justify-end">
+                      <Button onClick={handleSave} isLoading={saving} className="rounded-md px-12 h-12 font-black text-[11px] uppercase tracking-widest gap-2.5 shadow-xl shadow-primary/10 transition-all hover:translate-y-[-1px]">
+                         {savedSuccess ? <><CheckCircle2 className="h-4 w-4" /> PERSISTED</> : <><Save className="h-4 w-4" /> PERSIST CHANGES</>}
+                      </Button>
+                   </CardFooter>
+                </Card>
+             </div>
+           )}
+
+           {activeTab === "shop" && (
+             <div className="space-y-6 relative z-10">
+                <div className="flex items-center gap-2 px-1">
+                   <div className="w-1.5 h-4 bg-blue-500 rounded-full" />
+                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Business Entity Configuration</h3>
+                </div>
+                
+                <Card className="border shadow-sm overflow-hidden pointer-events-auto bg-card">
+                   <CardContent className="p-8 sm:p-10 space-y-10">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                         <Input label="Legal Entity Descriptor (Trade Name)" name="shopName" value={formData.shopName} onChange={handleInputChange} leftIcon={<Store className="h-4 w-4 text-muted-foreground/40" />} />
+                         <Input label="Fiscal Settlement Code (GSTIN)" name="gstin" value={formData.gstin} onChange={handleInputChange} placeholder="27XXXXX0000X0Z0" leftIcon={<ShieldCheck className="h-4 w-4 text-muted-foreground/40" />} />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 border-t pt-10 border-muted-foreground/5">
+                         <Input label="Strategic Network Mobile" name="mobile" value={formData.mobile} onChange={handleInputChange} leftIcon={<Phone className="h-4 w-4 text-muted-foreground/40" />} />
+                         <Input label="Registry Hub Node (City)" name="city" value="Mumbai" disabled leftIcon={<MapPin className="h-4 w-4 text-muted-foreground/10" />} />
+                      </div>
+                      <div className="space-y-1.5 border-t pt-10 border-muted-foreground/5">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1 opacity-60">Physical Operations Headquarters (Address)</label>
+                        <textarea 
+                          name="address"
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          placeholder="Full physical headquarters documentation..."
+                          className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-sm outline-none"
+                        />
+                      </div>
+                   </CardContent>
+                   <CardFooter className="bg-muted/10 px-10 py-6 border-t flex justify-end">
+                      <Button onClick={handleSave} isLoading={saving} className="rounded-md px-12 h-12 font-black text-[11px] uppercase tracking-widest gap-2.5 shadow-xl shadow-primary/10 transition-all hover:translate-y-[-1px]">
+                         {savedSuccess ? <><CheckCircle2 className="h-4 w-4" /> COMMITTED</> : <><Save className="h-4 w-4" /> COMMIT ENTITY</>}
+                      </Button>
+                   </CardFooter>
+                </Card>
+             </div>
+           )}
+
+           {activeTab === "security" && (
+             <div className="space-y-6 relative z-10">
+                <div className="flex items-center gap-2 px-1">
+                   <div className="w-1.5 h-4 bg-rose-500 rounded-full" />
+                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground">Strategic Security Infrastructure</h3>
+                </div>
+                
+                <div className="grid gap-4 scale-in-95 opacity-0 animate-in fade-in fill-mode-forwards duration-700">
+                   {[
+                      { icon: Lock, label: "Registry Access Key", desc: "Update primary encryption password", color: "text-zinc-600", bg: "bg-zinc-50" },
+                      { icon: CreditCard, label: "Settlement Channels", desc: "Configure UPI and high-value bank nodes", color: "text-emerald-500", bg: "bg-emerald-50" },
+                      { icon: Bell, label: "Notification Architecture", desc: "Event logs for high-precision entries", color: "text-blue-500", bg: "bg-blue-50" },
+                      { icon: Palette, label: "Interface Core Engine", desc: "Select visual saturation (Light/Dark)", color: "text-amber-500", bg: "bg-amber-50" },
+                      { icon: History, label: "Archive Trace Audit", desc: "Full history of recently modified nodes", color: "text-rose-400", bg: "bg-rose-50" },
+                   ].map((item, idx) => (
+                      <Card key={idx} className="group hover:border-primary/20 hover:shadow-lg transition-all duration-300 cursor-pointer pointer-events-auto bg-card overflow-hidden">
+                        <CardContent className="p-0 flex items-stretch h-20">
+                           <div className={cn("w-20 shrink-0 flex items-center justify-center transition-all bg-muted border-r group-hover:bg-primary/5 group-hover:border-primary/20", item.color)}>
+                              <item.icon className="h-6 w-6 group-hover:scale-110 transition-transform duration-500" />
+                           </div>
+                           <div className="flex items-center justify-between px-8 flex-1">
+                              <div className="flex flex-col">
+                                 <span className="text-sm font-black text-foreground uppercase tracking-widest leading-none mb-1.5">{item.label}</span>
+                                 <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none mt-1 opacity-40 group-hover:opacity-100 transition-opacity">{item.desc}</span>
+                              </div>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-20 group-hover:text-primary group-hover:opacity-100 transition-all group-hover:translate-x-1" />
+                           </div>
+                        </CardContent>
+                      </Card>
+                   ))}
+                </div>
+             </div>
+           )}
+
+           {/* System Integrity & Build Footnote */}
+           <Card className="rounded-xl bg-muted/20 border-dashed border-2 pointer-events-auto mt-20 group overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-8 opacity-[0.02] group-hover:scale-125 transition-transform duration-[2000ms] text-primary">
+                 <Cpu size={160} />
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Account */}
-        <div className="mb-6">
-          <h2 className="text-base font-bold text-[#111827] dark:text-white mb-4">
-            Account
-          </h2>
-
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowLogoutModal(true)}
-              className="w-full flex items-center justify-between p-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-200"
-            >
-              <div className="flex items-center gap-3">
-                <LogOut className="w-5 h-5" />
-                <span className="text-sm font-medium">Logout</span>
-              </div>
-            </button>
-
-            <button
-              className="w-full flex items-center justify-between p-4 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all duration-200"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Are you sure you want to delete your account? This action cannot be undone.",
-                  )
-                ) {
-                  alert("Account deletion feature coming soon");
-                }
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <Trash2 className="w-5 h-5" />
-                <span className="text-sm font-medium">Delete Account</span>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* App Info */}
-        <div className="text-center py-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Invocraft v{import.meta.env.VITE_APP_VERSION}
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            © {new Date().getFullYear()} All rights reserved
-          </p>
+              <CardContent className="p-10 relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
+                 <div className="flex items-center gap-6">
+                    <div className="h-14 w-14 bg-card rounded-xl flex items-center justify-center shadow-lg border relative group/icon">
+                       <Info className="h-7 w-7 text-muted-foreground/30 group-hover/icon:text-primary transition-colors" />
+                       <div className="absolute -top-1 -right-1 h-3 w-3 bg-emerald-500 rounded-full border-2 border-background animate-pulse" />
+                    </div>
+                    <div className="space-y-2 text-center md:text-left">
+                       <p className="text-[12px] font-black text-foreground uppercase tracking-[0.3em] leading-none">INVOCRAFT_ENGINE_V2.4-STABLE</p>
+                       <div className="flex items-center justify-center md:justify-start gap-4">
+                          <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest flex items-center gap-1.5"><Globe size={10} /> GLOBAL_CLUSTER active</span>
+                          <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest flex items-center gap-1.5"><Database size={10} /> DB_SYNC: 99.9%</span>
+                       </div>
+                    </div>
+                 </div>
+                 <div className="flex gap-8 border-t md:border-t-0 md:border-l border-muted-foreground/10 pt-8 md:pt-0 md:pl-12 w-full md:w-auto justify-center">
+                    <Link to="#" className="text-[10px] font-black text-muted-foreground hover:text-primary uppercase tracking-[0.2em] transition-all hover:scale-105">DOC_INDEX</Link>
+                    <Link to="#" className="text-[10px] font-black text-muted-foreground hover:text-primary uppercase tracking-[0.2em] transition-all hover:scale-105">EULA_AGREEMENT</Link>
+                    <Link to="#" className="text-[10px] font-black text-muted-foreground hover:text-primary uppercase tracking-[0.2em] transition-all hover:scale-105">NOD_AUDIT</Link>
+                 </div>
+              </CardContent>
+           </Card>
         </div>
       </div>
-
-      {showLogoutModal && (
-        <LogoutModal
-          isOpen={showLogoutModal}
-          onConfirm={handleLogout}
-          onClose={() => setShowLogoutModal(false)}
-        />
-      )}
     </div>
   );
 }

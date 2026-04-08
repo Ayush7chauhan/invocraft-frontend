@@ -1,8 +1,8 @@
 import React from "react";
-import { X, ShoppingCart } from "lucide-react";
-import Button from "../ui/Button";
+import { X, ShoppingBag, Package } from "lucide-react";
 import { Autocomplete } from "../ui/autocomplete";
 import Input from "../ui/Input";
+import Button from "../ui/Button";
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface AddItemModalProps {
   products: any[];
   modalItem: any;
   setModalItem: (item: any) => void;
-  onAdd: (andAddAnother: boolean) => void;
+  onAdd: (addAnother: boolean) => void;
   isEditing: boolean;
   formatAmount: (amount: number) => string;
 }
@@ -27,117 +27,127 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const handleProductSelect = (id: string) => {
-    const product = products.find((p) => p.id.toString() === id);
+  const selectedProduct = products.find((p) => p.id.toString() === modalItem.product_id?.toString());
+
+  const quantity = Number(modalItem.quantity) || 0;
+  const unitPrice = Number(modalItem.unit_price) || 0;
+  const taxRate = Number(modalItem.tax_rate) || 0;
+  
+  const subtotal = quantity * unitPrice;
+  const taxAmount = (subtotal * taxRate) / 100;
+  const total = subtotal + taxAmount;
+
+  const handleProductChange = (val: string) => {
+    const product = products.find((p) => p.id.toString() === val);
     if (product) {
       setModalItem({
         ...modalItem,
         product_id: product.id,
         product_name: product.name,
         unit_price: product.selling_price,
-        tax_rate: product.tax_rate || 0,
+        tax_rate: product.tax_rate,
       });
     }
   };
 
-  const subtotal = modalItem.quantity * modalItem.unit_price;
-  const tax = (subtotal * modalItem.tax_rate) / 100;
-  const total = subtotal + tax;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-300 px-4">
-      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-t-[32px] shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-600">
-              <ShoppingCart className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-gray-900 w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-800 animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+        <div className="p-8 space-y-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-600">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">
+                  {isEditing ? "Edit Item" : "Add New Item"}
+                </h3>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  {isEditing ? "Modify item details" : "Add product to your bill"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-widest">{isEditing ? "Edit Item" : "Add Item"}</h3>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Product Details</p>
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-2xl bg-gray-100 dark:bg-gray-800">
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-          {/* Product Search */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Search Product</label>
-            <Autocomplete
-              options={products.map((p) => ({
-                value: p.id.toString(),
-                label: p.name,
-              }))}
-              value={modalItem.product_id.toString()}
-              onValueChange={handleProductSelect}
-              placeholder="Find product..."
-            />
+            <button onClick={onClose} className="p-3 rounded-2xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all active:scale-90">
+              <X className="w-6 h-6" />
+            </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantity</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Search Product</label>
+              <Autocomplete
+                options={products.map((p) => ({ value: p.id.toString(), label: `${p.name} (Stock: ${p.stock_quantity})` }))}
+                value={modalItem.product_id?.toString() || ""}
+                onValueChange={handleProductChange}
+                placeholder="Start typing product name..."
+                className="rounded-[24px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <Input
+                label="Quantity"
                 type="number"
                 value={modalItem.quantity}
-                onChange={(e) => setModalItem({ ...modalItem, quantity: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => setModalItem({ ...modalItem, quantity: e.target.value })}
                 placeholder="0"
-                min="0"
+                min="1"
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unit Price</label>
               <Input
+                label="Unit Price"
                 type="number"
                 value={modalItem.unit_price}
-                onChange={(e) => setModalItem({ ...modalItem, unit_price: parseFloat(e.target.value) || 0 })}
+                onChange={(e) => setModalItem({ ...modalItem, unit_price: e.target.value })}
                 placeholder="0.00"
-                min="0"
+                leftIcon={<span className="text-xs font-bold text-gray-400">₹</span>}
               />
             </div>
-          </div>
 
-          <div className="p-5 bg-gray-50/50 dark:bg-gray-800/40 rounded-3xl border border-gray-100 dark:border-gray-800 space-y-3">
-             <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-               <span>Subtotal</span>
-               <span>{formatAmount(subtotal)}</span>
-             </div>
-             {modalItem.tax_rate > 0 && (
-               <div className="flex justify-between items-center text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                 <span>Tax ({modalItem.tax_rate}%)</span>
-                 <span>{formatAmount(tax)}</span>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Tax Rate (%)"
+                type="number"
+                value={modalItem.tax_rate}
+                onChange={(e) => setModalItem({ ...modalItem, tax_rate: e.target.value })}
+                placeholder="0"
+                max="100"
+              />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Item Total</label>
+                <div className="h-14 rounded-2xl bg-gray-50 dark:bg-gray-800/80 border-2 border-gray-100 dark:border-gray-800 flex items-center px-4 font-black text-green-600 dark:text-green-500 text-base">
+                  {formatAmount(total)}
+                </div>
+              </div>
+            </div>
+
+            {selectedProduct && (
+               <div className="p-4 rounded-3xl bg-blue-50 dark:bg-blue-900/10 border-2 border-blue-50/50 dark:border-blue-900/20 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <Package className="w-5 h-5 text-blue-500" />
+                  <p className="text-[10px] font-bold text-blue-600/80 dark:text-blue-400 uppercase tracking-widest">
+                    Available Stock: <span className="font-black text-blue-600 dark:text-blue-300">{selectedProduct.stock_quantity}</span>
+                  </p>
                </div>
-             )}
-             <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-gray-700">
-               <span className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-widest">Total</span>
-               <span className="text-xl font-black text-green-500 tracking-tight">{formatAmount(total)}</span>
-             </div>
+            )}
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/40 space-y-3">
-          {!isEditing && (
+          <div className="flex gap-3 pt-2">
+            {!isEditing && (
+              <Button 
+                variant="secondary" 
+                className="flex-1 h-16 rounded-[28px] font-black uppercase text-[11px] tracking-widest bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-2 border-gray-100 dark:border-gray-800"
+                onClick={() => onAdd(true)}
+              >
+                SAVE & ANOTHER
+              </Button>
+            )}
             <Button 
-              variant="secondary" 
-              className="w-full h-12 rounded-2xl uppercase font-black text-[11px] tracking-widest border-2 border-green-500/20 text-green-600 bg-green-50/30" 
-              onClick={() => onAdd(true)}
+              className={`flex-1 h-16 rounded-[28px] font-black uppercase text-sm tracking-widest shadow-xl ${isEditing ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20' : 'bg-green-500 hover:bg-green-600 shadow-green-500/20'}`}
+              onClick={() => onAdd(false)}
             >
-              Add & Add Another
+              {isEditing ? "Update Item" : "Add to Bill"}
             </Button>
-          )}
-          <Button 
-            className="w-full h-14 rounded-2xl shadow-xl shadow-green-500/20 uppercase font-black text-sm tracking-widest" 
-            onClick={() => onAdd(false)}
-            disabled={!modalItem.product_id || modalItem.quantity <= 0}
-          >
-            {isEditing ? "Update Item" : "Add to Invoice"}
-          </Button>
+          </div>
         </div>
       </div>
     </div>

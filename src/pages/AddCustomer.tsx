@@ -1,22 +1,37 @@
-import React, { useState, useMemo } from "react";
-import {
-  Search,
-  Plus,
-  Edit2,
-  Trash2,
-  Users,
-  AlertCircle
+import { useState, useMemo } from "react";
+import { 
+  Users, 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  Search, 
+  Filter, 
+  ShieldCheck, 
+  Phone, 
+  MapPin, 
+  History, 
+  CheckCircle2, 
+  ChevronRight,
+  TrendingUp,
+  ArrowUpRight,
+  ArrowDownLeft
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { partySchema, type PartyFormValues } from "../lib/validationSchema";
 import { useParties, useCreateParty, useUpdateParty, useDeleteParty } from "../hooks/useParties";
+import type { Party } from "../types/api";
+
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
-import PageContainer from "../components/ui/PageContainer";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { Card, CardContent } from "../components/ui/card";
 import Badge from "../components/ui/Badge";
-import type { Party } from "../types/api";
+import EmptyState from "../components/ui/EmptyState";
+import LoadingSpinner from "../components/ui/LoadingSpinner";
+import { cn } from "../lib/utils";
 
 export default function AddCustomer() {
   const navigate = useNavigate();
@@ -24,101 +39,92 @@ export default function AddCustomer() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "customer" | "supplier" | "both">("all");
 
-  const [formData, setFormData] = useState({
-    name: "",
-    mobile: "",
-    address: "",
-    gst_number: "",
-    type: "customer" as "customer" | "supplier" | "both",
-    opening_balance: "",
-    status: "active" as "active" | "inactive",
-  });
-
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingParty, setDeletingParty] = useState<Party | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const { data: parties = [], isLoading } = useParties();
   const createMutation = useCreateParty();
   const updateMutation = useUpdateParty();
   const deleteMutation = useDeleteParty();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    const newErrors: Record<string, string> = {};
-
-    const trimmedName = formData.name.trim();
-    if (!trimmedName) newErrors.name = "Party name is required.";
-
-    if (formData.mobile) {
-      if (!/^\d{10}$/.test(formData.mobile)) {
-        newErrors.mobile = "Mobile number must be exactly 10 digits.";
-      }
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+    setValue,
+    watch
+  } = useForm<PartyFormValues>({
+    resolver: zodResolver(partySchema) as any,
+    defaultValues: {
+      type: "customer",
+      status: "active",
+      openingBalance: 0,
+      balanceType: "To Receive",
+      mobile: "",
+      address: "",
+      gstNumber: "",
     }
+  });
 
-    const openBal = parseFloat(formData.opening_balance);
-    if (formData.opening_balance && isNaN(openBal)) {
-      newErrors.opening_balance = "Opening balance must be a valid number.";
-    }
+  const selectedType = watch("type");
+  const selectedBalanceType = watch("balanceType");
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    const payload = {
-      ...formData,
-      name: trimmedName,
-      opening_balance: openBal || 0,
-    };
-
+  const onSubmit = async (data: PartyFormValues) => {
     try {
+      const openBal = data.balanceType === "To Pay" ? -Math.abs(data.openingBalance) : Math.abs(data.openingBalance);
+
+      const payload = {
+        name: data.name,
+        mobile: data.mobile,
+        address: data.address,
+        gst_number: data.gstNumber,
+        type: data.type.toLowerCase(),
+        opening_balance: openBal,
+        status: data.status.toLowerCase(),
+      };
+
       if (editingId) {
-        await updateMutation.mutateAsync({ id: editingId, ...payload });
+        await updateMutation.mutateAsync({ id: editingId, ...payload } as any);
       } else {
-        await createMutation.mutateAsync(payload);
+        await createMutation.mutateAsync(payload as any);
       }
-      resetForm();
-    } catch (error: any) {
-      console.error("Failed to save party:", error);
-      setErrors({ submit: error.response?.data?.message || "Failed to save data to server." });
+      handleCloseForm();
+    } catch (e) {
+      console.error("Registry synchronization failure:", e);
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      mobile: "",
-      address: "",
-      gst_number: "",
-      type: "customer",
-      opening_balance: "",
-      status: "active",
-    });
-    setEditingId(null);
+  const handleCloseForm = () => {
     setShowForm(false);
-    setErrors({});
+    setEditingId(null);
+    reset();
   };
 
   const handleEdit = (party: Party, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFormData({
-      name: party.name,
-      mobile: party.mobile || "",
-      address: party.address || "",
-      gst_number: party.gst_number || "",
-      type: party.type,
-      opening_balance: party.opening_balance.toString(),
-      status: party.status || "active",
-    });
     setEditingId(party.id);
+    
+    setValue("name", party.name);
+    setValue("mobile", party.mobile || "");
+    setValue("address", party.address || "");
+    setValue("gstNumber", party.gst_number || "");
+    setValue("type", party.type as any);
+    setValue("status", (party.status || "active") as any);
+    setValue("openingBalance", Math.abs(party.opening_balance));
+    setValue("balanceType", party.opening_balance < 0 ? "To Pay" : "To Receive");
     setShowForm(true);
   };
 
+  const handleDelete = async () => {
+    if (deleteId) {
+      await deleteMutation.mutateAsync(deleteId);
+      setDeleteId(null);
+    }
+  };
+
   const filteredParties = useMemo(() => {
-    return parties.filter((p) => {
+    return parties.filter((p: Party) => {
       const q = searchQuery.toLowerCase();
       const matchesSearch = p.name.toLowerCase().includes(q) || (p.mobile?.includes(searchQuery));
       const matchesType = filterType === "all" || p.type === filterType;
@@ -126,148 +132,311 @@ export default function AddCustomer() {
     });
   }, [parties, searchQuery, filterType]);
 
-  const formatAmount = (v: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
+  const formatAmount = (v: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(Math.abs(v));
+  };
 
   return (
-    <PageContainer>
+    <div className="flex-1 flex flex-col min-h-screen bg-background pb-32 overflow-x-hidden theme-transition">
       <PageHeader
-        title={showForm ? (editingId ? "Edit Party" : "New Party") : "Parties & Ledger"}
-        showBack={true}
-        onBackClick={showForm ? resetForm : () => navigate(-1)}
+        title={showForm ? (editingId ? "Modify Protocol" : "Initialize Entity") : "Entity Registry"}
+        subtitle={showForm ? "Configure Commercial Counterparty Metadata" : "Global Commercial Network & Settlement Feed"}
+        showBack={showForm}
+        onBackClick={handleCloseForm}
         rightAction={
           !showForm && (
-            <Button size="icon" onClick={() => setShowForm(true)} className="rounded-xl shadow-lg shadow-green-500/20">
-              <Plus className="w-5 h-5" />
+            <Button size="sm" onClick={() => setShowForm(true)} className="rounded-md uppercase tracking-widest text-[10px] font-black h-9 shadow-lg shadow-primary/10">
+              <Plus className="w-3.5 h-3.5 mr-2" /> REGISTER ENTITY
             </Button>
           )
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 pb-32 custom-scrollbar">
+      <div className="flex-1 px-4 py-8 sm:px-6 lg:px-8 max-w-5xl mx-auto w-full space-y-12">
         {showForm ? (
-          <form onSubmit={handleSubmit} className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Party Name *</label>
-                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="e.g. John Doe / Gupta Corp" required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile</label>
-                  <Input value={formData.mobile} onChange={(e) => setFormData({...formData, mobile: e.target.value})} placeholder="10 Digit Number" maxLength={10} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Opening Bal.</label>
-                  <Input value={formData.opening_balance} onChange={(e) => setFormData({...formData, opening_balance: e.target.value})} placeholder="0.00" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Party Type</label>
-                 <div className="grid grid-cols-3 gap-2">
-                   {(["customer", "supplier", "both"] as const).map(t => (
-                     <button key={t} type="button" onClick={() => setFormData({...formData, type: t})} className={`h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${formData.type === t ? "bg-green-500 text-white border-green-500 shadow-lg" : "bg-white dark:bg-gray-800 text-gray-400 border-gray-100 dark:border-gray-800"}`}>
-                       {t}
-                     </button>
-                   ))}
-                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Address</label>
-                <textarea value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} className="w-full h-24 p-4 rounded-3xl border-2 border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800 text-sm outline-none focus:border-green-500 transition-colors resize-none" placeholder="Enter full address..." />
-              </div>
-            </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="animate-in slide-in-from-bottom-4 duration-500 space-y-12 pb-20">
             
-            {Object.keys(errors).length > 0 && (
-              <div className="bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-sm">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>Please fix the following errors:</span>
-                </div>
-                <ul className="text-xs text-rose-600 dark:text-rose-400 font-medium list-disc pl-5">
-                  {Object.values(errors).map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                </ul>
+            {/* Section 1: Identification */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                 <div className="w-1.5 h-5 bg-primary rounded-full" />
+                 <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Principal Metadata</h3>
               </div>
-            )}
+              
+              <Card className="border shadow-sm pointer-events-auto bg-card">
+                 <CardContent className="p-8 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <Input 
+                         label="Entity Trade Name" 
+                         placeholder="e.g. Acme Corp / Retail Node" 
+                         error={errors.name?.message}
+                         {...register("name")} 
+                         leftIcon={<Users className="w-4 h-4" />}
+                       />
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1 opacity-60">Classification Protocol</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {(["customer", "supplier", "both"] as const).map(t => (
+                              <button 
+                                key={t} 
+                                type="button" 
+                                onClick={() => setValue("type", t)} 
+                                className={cn(
+                                  "h-10 rounded-md text-[9px] font-black uppercase tracking-widest border transition-all",
+                                  selectedType === t 
+                                    ? "bg-primary text-primary-foreground border-primary shadow-md" 
+                                    : "bg-background text-muted-foreground border-input hover:bg-muted/50"
+                                )}
+                              >
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                       </div>
+                    </div>
 
-            <Button type="submit" isLoading={createMutation.isPending || updateMutation.isPending} className="w-full h-16 rounded-2xl shadow-xl shadow-green-500/20 font-black tracking-widest">
-              {editingId ? "UPDATE PARTY" : "CREATE PARTY"}
-            </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <Input 
+                         label="Communication Path (Mobile)" 
+                         placeholder="10-digit node identifier" 
+                         error={errors.mobile?.message}
+                         {...register("mobile")} 
+                         leftIcon={<Phone className="h-4 w-4" />}
+                       />
+                       <Input 
+                         label="Fiscal Identifier (GSTIN)" 
+                         placeholder="22AAAAA0000A1Z5" 
+                         error={errors.gstNumber?.message}
+                         {...register("gstNumber")} 
+                         leftIcon={<ShieldCheck className="h-4 w-4" />}
+                       />
+                    </div>
+
+                    <div className="space-y-1.5">
+                       <label className="text-sm font-medium leading-none text-muted-foreground ml-0.5 opacity-60">Physical Headquarters (Address)</label>
+                       <textarea 
+                         {...register("address")} 
+                         placeholder="Complete physical registry location..." 
+                         className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-sm outline-none"
+                       />
+                    </div>
+                 </CardContent>
+              </Card>
+            </div>
+
+            {/* Section 2: Fiscal Calibration */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                 <div className="w-1.5 h-5 bg-emerald-500 rounded-full" />
+                 <h3 className="text-xs font-black uppercase tracking-widest text-foreground">Settlement Calibration</h3>
+              </div>
+              
+              <Card className="border shadow-sm pointer-events-auto bg-card">
+                 <CardContent className="p-8 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <Input 
+                         label="Opening Fiscal Volume" 
+                         type="number"
+                         placeholder="0.00" 
+                         step="0.01"
+                         error={errors.openingBalance?.message}
+                         {...register("openingBalance")} 
+                         leftIcon={<span className="text-[11px] font-black opacity-40">₹</span>}
+                       />
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1 opacity-60">Settlement Direction</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(["To Receive", "To Pay"] as const).map(t => (
+                              <button 
+                                key={t} 
+                                type="button" 
+                                onClick={() => setValue("balanceType", t)} 
+                                className={cn(
+                                  "h-10 rounded-md text-[9px] font-black uppercase tracking-widest border transition-all",
+                                  selectedBalanceType === t 
+                                    ? (t === "To Pay" ? "bg-rose-50 text-rose-700 border-rose-200 shadow-sm" : "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm")
+                                    : "bg-background text-muted-foreground border-input hover:bg-muted/50"
+                                )}
+                              >
+                                {t === "To Pay" ? <ArrowUpRight className="inline w-3 h-3 mr-1" /> : <ArrowDownLeft className="inline w-3 h-3 mr-1" />}
+                                {t}
+                              </button>
+                            ))}
+                          </div>
+                       </div>
+                    </div>
+                 </CardContent>
+              </Card>
+            </div>
+
+            <div className="pt-4 flex flex-col sm:flex-row gap-4">
+               <Button 
+                type="button" 
+                variant="outline"
+                onClick={handleCloseForm}
+                className="flex-1 h-12 uppercase font-black tracking-widest text-[11px]"
+               >
+                 DISCARD DRAFT
+               </Button>
+               <Button 
+                type="submit" 
+                isLoading={isSubmitting} 
+                className="flex-1 h-12 uppercase font-black tracking-widest text-[11px]"
+               >
+                 {editingId ? "UPDATE REGISTRY NODE" : "COMMIT ENTITY REGISTER"}
+               </Button>
+            </div>
           </form>
         ) : (
-          <div className="space-y-6">
-            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-green-500" />
-              <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="SEARCH PARTIES..." className="pl-12 rounded-2xl bg-gray-50 border-none shadow-inner" />
+          <div className="space-y-12">
+            {/* Global Visual Metadata */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in fade-in duration-700">
+               <Card className="border bg-card shadow-sm pointer-events-auto p-6 flex flex-col justify-between h-32 hover:border-primary/20 transition-all group">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 group-hover:opacity-100 transition-opacity">Consolidated Network</span>
+                  <div className="flex items-end justify-between">
+                     <span className="text-3xl font-black text-foreground tracking-tighter">{parties.length}</span>
+                     <Badge variant="outline" className="text-[9px] font-black h-5 uppercase tracking-widest bg-emerald-50 text-emerald-700 border-emerald-100">NODES_ONLINE</Badge>
+                  </div>
+               </Card>
+               <Card className="border bg-card shadow-sm pointer-events-auto p-6 flex flex-col justify-between h-32 hover:border-emerald-200 transition-all group">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 group-hover:opacity-100 transition-opacity text-emerald-600">Receivable Protocol</span>
+                  <TrendingUp className="text-emerald-500 opacity-20 group-hover:opacity-100 transition-opacity absolute right-4 top-4" size={24} />
+                  <div className="flex items-end">
+                     <span className="text-2xl font-black text-emerald-700 tracking-tighter">0.00</span>
+                  </div>
+               </Card>
+               <Card className="border bg-card shadow-sm pointer-events-auto p-6 flex flex-col justify-between h-32 hover:border-rose-200 transition-all group">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60 group-hover:opacity-100 transition-opacity text-rose-600">Payable Liabilities</span>
+                  <div className="flex items-end">
+                     <span className="text-2xl font-black text-rose-700 tracking-tighter">0.00</span>
+                  </div>
+               </Card>
             </div>
 
-            <div className="flex gap-2 pb-2 overflow-x-auto hide-scrollbar">
-              {(["all", "customer", "supplier", "both"] as const).map(t => (
-                <button key={t} onClick={() => setFilterType(t)} className={`px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${filterType === t ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900" : "bg-gray-100 text-gray-400 dark:bg-gray-800"}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-
-            {isLoading ? (
-               <div className="grid gap-4">
-                 {[1,2,3,4].map(i => <div key={i} className="h-24 bg-gray-50 dark:bg-gray-800/50 animate-pulse rounded-[32px]" />)}
-               </div>
-            ) : filteredParties.length === 0 ? (
-               <div className="py-20 text-center space-y-4">
-                  <Users className="w-16 h-16 text-gray-200 mx-auto" />
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest">No parties found</p>
-               </div>
-            ) : (
-              <div className="grid gap-4">
-                {filteredParties.map(party => (
-                  <Card key={party.id} className="group rounded-[32px] border-2 border-gray-50 dark:border-gray-800/50 hover:border-green-500/20 hover:shadow-xl transition-all duration-300">
-                    <CardContent className="p-5 flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1 min-w-0" onClick={() => navigate(`/ledger/${party.id}`, { state: { contactName: party.name, contactType: "business" } })}>
-                        <div className="w-14 h-14 rounded-2xl bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center text-gray-400 font-black text-xl group-hover:bg-green-500/10 group-hover:text-green-500 transition-colors">
-                          {party.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-black text-gray-900 dark:text-white truncate uppercase tracking-tight">{party.name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                             <p className="text-[10px] font-bold text-gray-400 truncate">{party.mobile || "No Number"}</p>
-                             <Badge variant="primary" className="text-[8px] px-1.5 py-0">
-                                {party.type}
-                             </Badge>
-                          </div>
-                          {party.opening_balance !== 0 && (
-                             <p className={`text-[10px] font-black mt-1 ${party.opening_balance > 0 ? "text-green-500" : "text-rose-500"}`}>
-                               BAL: {formatAmount(Math.abs(party.opening_balance))}
-                             </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={(e) => handleEdit(party, e)} className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeletingParty(party); setDeleteModalOpen(true); }} className="w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all flex items-center justify-center">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                 <Input 
+                   placeholder="Search commercial counterparties..." 
+                   value={searchQuery} 
+                   onChange={(e) => setSearchQuery(e.target.value)} 
+                   leftIcon={<Search className="w-4 h-4" />}
+                   className="h-11 shadow-sm border-muted-foreground/10"
+                 />
+                 <div className="flex bg-muted/30 p-1 rounded-md border shadow-sm w-full sm:w-auto overflow-x-auto hide-scrollbar">
+                    {(["all", "customer", "supplier", "both"] as const).map(t => (
+                      <button 
+                        key={t} 
+                        onClick={() => setFilterType(t)} 
+                        className={cn(
+                          "px-4 py-2 rounded-sm text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap whitespace-nowrap shrink-0",
+                          filterType === t ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                 </div>
               </div>
-            )}
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                   <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.25em]">Registry Feed</p>
+                      <Badge variant="secondary" className="text-[9px] h-5">{filteredParties.length} Entities Indexed</Badge>
+                   </div>
+                   <History className="w-4 h-4 text-muted-foreground/40" />
+                </div>
+
+                {isLoading ? (
+                  <div className="grid gap-3">
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} className="h-20 bg-muted/20 animate-pulse rounded-md border" />
+                    ))}
+                  </div>
+                ) : filteredParties.length === 0 ? (
+                  <EmptyState 
+                    title="Registry Static"
+                    description={searchQuery ? "No commercial counterparties match the current query node." : "Initialize your first commercial connection to begin settlement logs."}
+                    icon={<Users className="w-12 h-12 text-muted-foreground/20" />}
+                    actionLabel={!searchQuery ? "REGISTER ENTITY" : undefined}
+                    onAction={!searchQuery ? () => setShowForm(true) : undefined}
+                  />
+                ) : (
+                  <div className="grid gap-3 animate-in fade-in duration-700">
+                    {filteredParties.map(party => (
+                      <Card 
+                        key={party.id} 
+                        className="group pointer-events-auto hover:border-primary/20 transition-all duration-300 shadow-sm hover:shadow-md bg-card overflow-hidden" 
+                        onClick={() => navigate(`/ledger/${party.id}`, { state: { contactName: party.name, contactType: "business" } })}
+                      >
+                        <CardContent className="p-4 flex items-center justify-between">
+                           <div className="flex items-center gap-4 flex-1 min-w-0">
+                              <div className="h-12 w-12 rounded-lg bg-zinc-50 border flex items-center justify-center text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary transition-all overflow-hidden bg-cover bg-center" style={{ backgroundImage: `url('https://ui-avatars.com/api/?name=${party.name}&background=f9fafb&color=18181b&bold=true')` }}>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                 <div className="flex items-center gap-2">
+                                    <h4 className="font-black text-foreground uppercase tracking-widest text-sm truncate">{party.name}</h4>
+                                    <ChevronRight className="w-3 h-3 text-muted-foreground/20 group-hover:translate-x-1 transition-transform" />
+                                 </div>
+                                 <div className="flex items-center gap-2 mt-1 opacity-60">
+                                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">{party.mobile || "EXT_ID_NULL"}</span>
+                                    <span className="w-1 h-1 rounded-full bg-border" />
+                                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none text-primary">{party.type}</span>
+                                 </div>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-8 shrink-0">
+                             <div className="text-right hidden sm:block">
+                                <p className={cn(
+                                   "text-sm font-black tracking-tight leading-none mb-1",
+                                   party.opening_balance > 0 ? "text-emerald-600" : party.opening_balance < 0 ? "text-rose-600" : "text-muted-foreground"
+                                )}>
+                                   {formatAmount(party.opening_balance)}
+                                </p>
+                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-40">FISCAL_BALANCE</p>
+                             </div>
+                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={(e) => handleEdit(party, e)} 
+                                  className="h-9 w-9 rounded-md hover:bg-muted"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={(e) => { e.stopPropagation(); setDeleteId(party.id); }} 
+                                  className="h-9 w-9 rounded-md hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                             </div>
+                           </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       <DeleteConfirmModal
-        isOpen={deleteModalOpen}
-        onClose={() => { setDeleteModalOpen(false); setDeletingParty(null); }}
-        onConfirm={() => deletingParty && deleteMutation.mutate(deletingParty.id, { onSettled: () => setDeleteModalOpen(false) })}
-        title="Delete Party?"
-        message={`Are you sure you want to delete ${deletingParty?.name}? All associated invoices and ledger entries will be permanently removed.`}
-        itemName={deletingParty?.name || ""}
+        isOpen={!!deleteId}
+        isLoading={deleteMutation.isPending}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Nullify Entity Protocol"
+        message="This operation will permanently delete the commercial counterparty node. All associated registry logs will be purged."
       />
-    </PageContainer>
+    </div>
   );
 }
