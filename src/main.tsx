@@ -1,31 +1,40 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { Toaster } from 'sonner';
+import { queryClient } from './lib/queryClient';
+import './index.css';
+import App from './App.tsx';
 
-// Initialize theme before rendering
-const initializeTheme = () => {
-  const stored = localStorage.getItem('theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const shouldBeDark = stored === 'dark' || (!stored && prefersDark);
-  
-  const html = document.documentElement;
-  const body = document.body;
-  
-  if (shouldBeDark) {
-    html.classList.add('dark');
-    body.classList.add('dark');
-  } else {
-    html.classList.remove('dark');
-    body.classList.remove('dark');
-  }
-};
+// ── Initialize theme before first paint ──────────────────────────────────────
+const stored = localStorage.getItem('theme');
+const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+const isDark = stored === 'dark' || (!stored && prefersDark);
+document.documentElement.classList.toggle('dark', isDark);
+document.body.classList.toggle('dark', isDark);
 
-// Initialize theme immediately
-initializeTheme();
-
+// ── Render ────────────────────────────────────────────────────────────────────
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+      {/* Toast notifications — available globally via sonner's toast() */}
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        duration={4000}
+        toastOptions={{
+          classNames: {
+            toast: 'font-sans text-sm',
+          },
+        }}
+      />
+      {/* React Query DevTools — only in development */}
+      {import.meta.env.DEV && (
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+      )}
+    </QueryClientProvider>
   </StrictMode>,
-)
+);

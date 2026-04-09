@@ -57,7 +57,7 @@ export default function Home({ onSubmit }: HomeProps) {
       setError(
         axios.isAxiosError(err)
           ? (err.response?.data?.message ??
-              "Failed to send OTP. Please try again.")
+              "Failed to send OTP. Please try again :")
           : "Failed to send OTP. Please try again.",
       );
     } finally {
