@@ -168,6 +168,11 @@ export default function Home({ onSubmit }: HomeProps) {
             label="No Password"
           />
         </div>
+        <div className="text-center pt-4">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Invocraft v{import.meta.env.VITE_APP_VERSION ?? "0.0.0"}
+          </p>
+        </div>
       </div>
     </div>
   );
