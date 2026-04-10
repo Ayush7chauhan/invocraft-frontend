@@ -21,7 +21,7 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "http://100.48.47.44/api",
+        target: process.env.VITE_API_URL || "",
         changeOrigin: true,
         secure: false,
       },
