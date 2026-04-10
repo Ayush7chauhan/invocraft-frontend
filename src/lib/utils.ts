@@ -51,12 +51,19 @@ export function getAuthToken(): string | null {
   return localStorage.getItem('auth_token');
 }
 
-/** Clear all auth-related storage */
-export function clearAuthStorage(): void {
+/** Clear all auth-related storage and optionally reset React Query cache */
+export function clearAuthStorage(queryClient?: import('@tanstack/react-query').QueryClient): void {
+  // localStorage
   localStorage.removeItem('auth_token');
   localStorage.removeItem('user');
   localStorage.removeItem('temp_mobile');
   localStorage.removeItem('temp_user');
+  // sessionStorage — clear everything (no sensitive data should linger)
+  sessionStorage.clear();
+  // React Query cache — avoids previous user's data showing to next user
+  if (queryClient) {
+    queryClient.clear();
+  }
 }
 
 /** Truncate text to a max length */

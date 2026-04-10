@@ -5,6 +5,7 @@ import type { ApiResponse, Product, ProductFormData } from '@/types';
 export interface ProductListParams {
   search?: string;
   category_id?: number;
+  status?: 'active' | 'inactive';
   low_stock?: boolean;
   page?: number;
   per_page?: number;

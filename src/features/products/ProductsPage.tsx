@@ -9,7 +9,6 @@ import { Plus, Package, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import productsService from '@/services/products.service';
 import categoriesService from '@/services/categories.service';
-import unitsService from '@/services/units.service';
 import { confirmDelete } from '@/components/common/ConfirmDialog';
 import SearchInput from '@/components/common/SearchInput';
 import PageHeader from '@/components/common/PageHeader';
@@ -28,7 +27,7 @@ const productSchema = z.object({
   sku: z.string().optional(),
   barcode: z.string().optional(),
   category_id: z.number().optional(),
-  unit_id: z.number().optional(),
+  unit_action: z.enum(['default', 'remove']),
   purchase_price: z.number().min(0, 'Purchase price required'),  // required by backend
   selling_price: z.number().min(0, 'Selling price required'),
   stock_quantity: z.number().int().min(0, 'Stock cannot be negative'),
@@ -47,15 +46,20 @@ export default function ProductsPage() {
 
   const [search, setSearch] = useState('');
   const [showLowStock, setShowLowStock] = useState(searchParams.get('lowStock') === 'true');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [showForm, setShowForm] = useState(searchParams.get('openForm') === 'true');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────────
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['products', search, showLowStock],
+    queryKey: ['products', search, showLowStock, statusFilter],
     queryFn: async () => {
-      const res = await productsService.list({ search, low_stock: showLowStock || undefined });
+      const res = await productsService.list({
+        search,
+        low_stock: showLowStock || undefined,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      });
       return res.data.data as Product[];
     },
   });
@@ -64,14 +68,6 @@ export default function ProductsPage() {
     queryKey: ['categories'],
     queryFn: async () => {
       const res = await categoriesService.list();
-      return res.data.data;
-    },
-  });
-
-  const { data: units = [] } = useQuery({
-    queryKey: ['units'],
-    queryFn: async () => {
-      const res = await unitsService.list();
       return res.data.data;
     },
   });
@@ -86,7 +82,7 @@ export default function ProductsPage() {
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
-    defaultValues: { status: 'active', stock_quantity: 0, purchase_price: 0 },
+    defaultValues: { status: 'active', stock_quantity: 0, purchase_price: 0, unit_action: 'default' },
   });
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -97,7 +93,7 @@ export default function ProductsPage() {
       qc.invalidateQueries({ queryKey: ['products'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       toast.success('Product added successfully');
-      reset({ status: 'active', stock_quantity: 0, purchase_price: 0 });
+      reset({ status: 'active', stock_quantity: 0, purchase_price: 0, unit_action: 'default' });
       setShowForm(false);
     },
     onError: (err) => {
@@ -151,7 +147,7 @@ export default function ProductsPage() {
       sku: product.sku ?? '',
       barcode: product.barcode ?? '',
       category_id: product.category_id,
-      unit_id: product.unit_id,
+      unit_action: product.unit_id ? 'default' : 'remove',
       purchase_price: Number(product.purchase_price ?? 0),
       selling_price: Number(product.selling_price),
       stock_quantity: product.stock_quantity,
@@ -171,7 +167,11 @@ export default function ProductsPage() {
   const isMutating = createMutation.isPending || updateMutation.isPending;
 
   const categoryOptions = categories.map((c) => ({ value: c.id, label: c.name }));
-  const unitOptions = units.map((u) => ({ value: u.id, label: `${u.name} (${u.short_name})` }));
+
+  const UNIT_ACTION_OPTIONS = [
+    { value: 'default', label: 'Default' },
+    { value: 'remove',  label: 'Remove'  },
+  ];
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -194,11 +194,13 @@ export default function ProductsPage() {
 
       <div className="px-4 pt-2 pb-3 space-y-2">
         <SearchInput value={search} onChange={setSearch} placeholder="Search products..." />
-        <div className="flex gap-2">
-          <FilterChip active={!showLowStock} onClick={() => setShowLowStock(false)} label="All" />
+        <div className="flex gap-2 flex-wrap">
+          <FilterChip active={!showLowStock && statusFilter === 'all'} onClick={() => { setShowLowStock(false); setStatusFilter('all'); }} label="All" />
+          <FilterChip active={statusFilter === 'active'} onClick={() => { setShowLowStock(false); setStatusFilter('active'); }} label="Active" />
+          <FilterChip active={statusFilter === 'inactive'} onClick={() => { setShowLowStock(false); setStatusFilter('inactive'); }} label="Inactive" />
           <FilterChip
             active={showLowStock}
-            onClick={() => setShowLowStock(true)}
+            onClick={() => { setShowLowStock(true); setStatusFilter('all'); }}
             label="Low Stock"
             icon={<AlertTriangle size={12} />}
           />
@@ -236,11 +238,10 @@ export default function ProductsPage() {
                   />
                 </FormField>
 
-                <FormField label="Unit" error={errors.unit_id?.message}>
+                <FormField label="Unit" error={errors.unit_action?.message}>
                   <Select
-                    {...register('unit_id', { valueAsNumber: true })}
-                    options={unitOptions}
-                    placeholder="Select..."
+                    {...register('unit_action')}
+                    options={UNIT_ACTION_OPTIONS}
                   />
                 </FormField>
 
@@ -292,6 +293,16 @@ export default function ProductsPage() {
                     type="number"
                     step="0.1"
                     placeholder="0"
+                  />
+                </FormField>
+
+                <FormField label="Status" error={errors.status?.message}>
+                  <Select
+                    {...register('status')}
+                    options={[
+                      { value: 'active', label: 'Active' },
+                      { value: 'inactive', label: 'Inactive' },
+                    ]}
                   />
                 </FormField>
               </div>

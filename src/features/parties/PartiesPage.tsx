@@ -58,31 +58,63 @@ export default function PartiesPage({ partyType }: PartiesPageProps) {
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [showForm, setShowForm] = useState(searchParams.get('openForm') === 'true');
   const [editingParty, setEditingParty] = useState<Party | null>(null);
+  const [emailSuggestions, setEmailSuggestions] = useState<string[]>([]);
 
   // ── Data ──────────────────────────────────────────────────────────────────────
 
   const { data: parties = [], isLoading } = useQuery({
-    queryKey: ['parties', partyType, search],
+    queryKey: ['parties', partyType, search, statusFilter],
     queryFn: async () => {
-      const res = await partiesService.list({ type: partyType, search });
+      const res = await partiesService.list({
+        type: partyType,
+        search,
+        status: statusFilter === 'all' ? undefined : statusFilter,
+      });
       return res.data.data as Party[];
     },
   });
 
   // ── Form ──────────────────────────────────────────────────────────────────────
 
+  const EMAIL_DOMAINS = ['@gmail.com', '@outlook.com', '@yahoo.com', '@hotmail.com', '@icloud.com'];
+
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    setValue,
     formState: { errors },
   } = useForm<PartyFormValues>({
     resolver: zodResolver(partySchema),
-    defaultValues: { type: partyType ?? 'customer', status: 'active' },
+    defaultValues: { type: partyType ?? 'customer', status: 'active', opening_balance: 0 },
   });
+
+  const handleEmailChange = (value: string) => {
+    if (value.includes('@')) {
+      const [local, domainPart] = value.split('@');
+      if (local) {
+        const filtered = EMAIL_DOMAINS
+          .filter((d) => d.slice(1).startsWith(domainPart ?? ''))
+          .map((d) => `${local}${d}`);
+        setEmailSuggestions(filtered);
+      } else {
+        setEmailSuggestions([]);
+      }
+    } else if (value.length > 0) {
+      setEmailSuggestions(EMAIL_DOMAINS.map((d) => `${value}${d}`));
+    } else {
+      setEmailSuggestions([]);
+    }
+  };
+
+  const applyEmailSuggestion = (suggestion: string) => {
+    setValue('email', suggestion, { shouldValidate: true });
+    setEmailSuggestions([]);
+  };
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
@@ -189,8 +221,27 @@ export default function PartiesPage({ partyType }: PartiesPageProps) {
         }
       />
 
-      <div className="px-4 pt-2 pb-3">
+      <div className="px-4 pt-2 pb-3 space-y-2">
         <SearchInput value={search} onChange={setSearch} placeholder={`Search ${title.toLowerCase()}...`} />
+        <div className="flex gap-2">
+          {(['all', 'active', 'inactive'] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-colors ${
+                statusFilter === s
+                  ? s === 'active'
+                    ? 'bg-green-600 text-white'
+                    : s === 'inactive'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-green-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+              }`}
+            >
+              {s === 'all' ? 'All' : s === 'active' ? 'Active' : 'Inactive'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Form */}
@@ -235,7 +286,34 @@ export default function PartiesPage({ partyType }: PartiesPageProps) {
               </div>
 
               <FormField label="Email" error={errors.email?.message}>
-                <Input {...register('email')} type="email" placeholder="email@example.com" error={Boolean(errors.email)} />
+                <div className="relative">
+                  <Input
+                    {...register('email', {
+                      onChange: (e) => handleEmailChange(e.target.value),
+                    })}
+                    type="text"
+                    inputMode="email"
+                    autoComplete="off"
+                    placeholder="email@example.com"
+                    error={Boolean(errors.email)}
+                    onBlur={() => setTimeout(() => setEmailSuggestions([]), 150)}
+                  />
+                  {emailSuggestions.length > 0 && (
+                    <ul className="absolute top-full left-0 right-0 z-50 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg overflow-hidden">
+                      {emailSuggestions.map((s) => (
+                        <li key={s}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); applyEmailSuggestion(s); }}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            {s}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </FormField>
 
               <FormField label="Address" error={errors.address?.message}>
@@ -253,6 +331,16 @@ export default function PartiesPage({ partyType }: PartiesPageProps) {
                     type="number"
                     step="0.01"
                     placeholder="0.00"
+                  />
+                </FormField>
+
+                <FormField label="Status" error={errors.status?.message} className="col-span-2">
+                  <Select
+                    {...register('status')}
+                    options={[
+                      { value: 'active', label: 'Active' },
+                      { value: 'inactive', label: 'Inactive' },
+                    ]}
                   />
                 </FormField>
               </div>
@@ -349,9 +437,14 @@ function PartyCard({
         </div>
 
         <div className="flex flex-col items-end gap-2 shrink-0">
-          <Badge variant={party.type === 'supplier' ? 'warning' : 'success'}>
-            {party.type}
-          </Badge>
+          <div className="flex gap-1.5 flex-wrap justify-end">
+            <Badge variant={party.type === 'supplier' ? 'warning' : 'success'}>
+              {party.type}
+            </Badge>
+            {party.status === 'inactive' && (
+              <Badge variant="outline">Inactive</Badge>
+            )}
+          </div>
           {balance !== 0 && (
             <span className={cn(
               'text-xs font-semibold',

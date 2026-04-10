@@ -5,6 +5,7 @@ import type { ApiResponse, Party, PartyFormData } from '@/types';
 export interface PartyListParams {
   search?: string;
   type?: string;
+  status?: 'active' | 'inactive';
   page?: number;
   per_page?: number;
 }

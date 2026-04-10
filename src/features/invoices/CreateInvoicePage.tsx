@@ -24,13 +24,24 @@ import dayjs from 'dayjs';
 
 const invoiceItemSchema = z.object({
   product_id: z.number().min(1, 'Select a product'),
-  // name is display-only, not sent to API
+  // display-only fields, not sent to API
   name: z.string().optional(),
-  quantity: z.number().min(1, 'Qty must be ≥ 1'),
+  stock_quantity: z.number().optional(),
+  quantity: z.number().int('Must be a whole number').min(1, 'Qty must be ≥ 1'),
   unit_price: z.number().min(0, 'Price cannot be negative'),
   tax_rate: z.number().min(0).max(100).optional(),
-  // total is display-only
   total: z.number().optional(),
+}).superRefine((item, ctx) => {
+  if (
+    item.stock_quantity !== undefined &&
+    item.quantity > item.stock_quantity
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Only ${item.stock_quantity} in stock`,
+      path: ['quantity'],
+    });
+  }
 });
 
 const createInvoiceSchema = z.object({
@@ -131,6 +142,8 @@ export default function CreateInvoicePage() {
     setValue(`items.${index}.quantity`, 1);
     setValue(`items.${index}.tax_rate`, Number(product.tax_rate ?? 0));
     setValue(`items.${index}.total`, product.selling_price);
+    // Store available stock on the item for validation
+    setValue(`items.${index}.stock_quantity`, product.stock_quantity);
     setShowProductSearch(null);
     setProductSearch('');
   };
@@ -156,11 +169,11 @@ export default function CreateInvoicePage() {
       discount: Number(values.discount) || 0,
       paid_amount: Number(values.paid_amount) || 0,
       notes: values.notes,
-      items: values.items.map((item) => ({
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        tax_rate: item.tax_rate,
+      items: values.items.map(({ product_id, quantity, unit_price, tax_rate }) => ({
+        product_id,
+        quantity,
+        unit_price,
+        tax_rate,
       })),
     };
     createMutation.mutate(payload);
@@ -272,7 +285,14 @@ export default function CreateInvoicePage() {
 
                 {/* Qty, Price, Tax */}
                 <div className="grid grid-cols-3 gap-2">
-                  <FormField label="Qty" error={errors.items?.[index]?.quantity?.message}>
+                  <FormField
+                    label={
+                      items[index]?.stock_quantity !== undefined
+                        ? `Qty (max ${items[index].stock_quantity})`
+                        : 'Qty'
+                    }
+                    error={errors.items?.[index]?.quantity?.message}
+                  >
                     <Input
                       {...register(`items.${index}.quantity`, {
                         valueAsNumber: true,
@@ -281,8 +301,14 @@ export default function CreateInvoicePage() {
                       type="number"
                       step="1"
                       min={1}
+                      max={items[index]?.stock_quantity ?? undefined}
                       placeholder="1"
                       error={Boolean(errors.items?.[index]?.quantity)}
+                      onKeyDown={(e) => {
+                        if (['.', 'e', 'E', '+', '-'].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
                     />
                   </FormField>
                   <FormField label="Price (₹)" error={errors.items?.[index]?.unit_price?.message}>

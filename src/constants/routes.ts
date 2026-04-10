@@ -43,4 +43,8 @@ export const ROUTES = {
 
   // Settings
   SETTINGS: '/settings',
+
+  // Legal
+  TERMS:   '/terms',
+  PRIVACY: '/privacy',
 } as const;

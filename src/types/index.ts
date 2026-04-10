@@ -17,15 +17,22 @@ export type BusinessType = 'grocery' | 'medical' | 'general' | 'other';
 // ── Shop / Settings ──────────────────────────────────────────────────────────
 
 export interface Shop {
-  id: number;
-  user_id: number;
+  // ── Profile (from User model) ─────────────────────────────────────────────
   shop_name: string;
   owner_name: string;
   mobile_number: string;
   shop_address?: string;
   business_type?: BusinessType;
   gst_number?: string;
+
+  // ── Billing / Invoice (from Setting model) ────────────────────────────────
   invoice_prefix?: string;
+  invoice_start_number?: number;
+  currency?: string;
+  currency_symbol?: string;
+  default_tax_rate?: number;
+  show_tax_on_invoice?: boolean;
+  invoice_footer_note?: string;
 }
 
 // ── Party (Customer / Supplier) ──────────────────────────────────────────────
@@ -75,16 +82,26 @@ export interface CategoryFormData {
 
 // ── Unit ─────────────────────────────────────────────────────────────────────
 
+export type UnitType = 'mass' | 'volume' | 'count' | 'length' | 'other';
+
 export interface Unit {
   id: number;
   name: string;
   short_name: string;
+  type?: UnitType;
+  /** Short name of the reference unit (e.g. "kg", "l", "pcs", "m") */
+  base_unit?: string;
+  /** 1 [this unit] = conversion_factor [base_unit] */
+  conversion_factor?: number;
   created_at?: string;
 }
 
 export interface UnitFormData {
   name: string;
   short_name: string;
+  type?: UnitType;
+  base_unit?: string;
+  conversion_factor?: number;
 }
 
 // ── Product ──────────────────────────────────────────────────────────────────

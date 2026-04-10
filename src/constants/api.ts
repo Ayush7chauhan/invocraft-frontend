@@ -46,6 +46,7 @@ export const API = {
     CREATE: '/units',
     UPDATE: (id: number) => `/units/${id}`,
     DELETE: (id: number) => `/units/${id}`,
+    SEED_DEFAULTS: '/units/seed-defaults',
   },
 
   // Invoices

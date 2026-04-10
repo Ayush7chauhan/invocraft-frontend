@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Phone,
   Clock,
@@ -12,6 +13,7 @@ import {
 const LOGO_SRC = "/logo.png";
 
 export default function Login() {
+  const navigate = useNavigate();
   const [mobile, setMobile] = useState("");
   const [error, setError] = useState("");
 
@@ -231,13 +233,21 @@ export default function Login() {
           <div>
             <p className="text-center text-xs text-gray-400">
               By continuing, you agree to our{" "}
-              <span className="text-green-600 hover:underline cursor-pointer">
+              <button
+                type="button"
+                onClick={() => navigate("/terms")}
+                className="text-green-600 hover:underline font-medium"
+              >
                 Terms of Service
-              </span>{" "}
+              </button>{" "}
               and{" "}
-              <span className="text-green-600 hover:underline cursor-pointer">
+              <button
+                type="button"
+                onClick={() => navigate("/privacy")}
+                className="text-green-600 hover:underline font-medium"
+              >
                 Privacy Policy
-              </span>
+              </button>
             </p>
 
             {/* Feature icons */}

@@ -14,6 +14,12 @@ const unitsService = {
 
   delete: (id: number) =>
     api.delete<ApiResponse<null>>(API.UNITS.DELETE(id)),
+
+  /** POST /api/units/seed-defaults — adds standard units for the current user */
+  seedDefaults: () =>
+    api.post<ApiResponse<{ created: Unit[]; skipped_count: number }>>(
+      API.UNITS.SEED_DEFAULTS,
+    ),
 };
 
 export default unitsService;

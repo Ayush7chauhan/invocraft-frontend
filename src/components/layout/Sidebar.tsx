@@ -20,9 +20,10 @@ import {
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/constants/routes';
 import { useAuth } from '@/hooks/useAuth';
-import Swal from 'sweetalert2';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { clearAuthStorage } from '@/lib/utils';
+import LogoutModal from '@/components/LogoutModal';
 
 interface NavItem {
   id: string;
@@ -118,7 +119,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { shopName, ownerName } = useAuth();
+  const qc = useQueryClient();
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
   const isChildActive = (item: NavItem) =>
@@ -138,24 +141,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     onClose();
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     onClose();
-    const result = await Swal.fire({
-      title: 'Logout?',
-      text: 'You will be logged out of Invocraft.',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Logout',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-    });
+    setShowLogoutModal(true);
+  };
 
-    if (result.isConfirmed) {
-      clearAuthStorage();
-      toast.success('Logged out successfully');
-      navigate(ROUTES.LOGIN, { replace: true });
-    }
+  const confirmLogout = () => {
+    clearAuthStorage(qc);
+    toast.success('Logged out successfully');
+    navigate(ROUTES.LOGIN, { replace: true });
   };
 
   return (
@@ -308,6 +302,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </motion.aside>
         )}
       </AnimatePresence>
+      <LogoutModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={confirmLogout}
+      />
     </>
   );
 }

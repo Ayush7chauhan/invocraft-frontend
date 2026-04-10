@@ -28,7 +28,11 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem("auth_token");
-      window.location.href = "/login"; // optional: auto-redirect on token expiry
+      // Only redirect if not already on an auth page — prevents OTP page hijack
+      const path = window.location.pathname;
+      if (!path.includes("/login") && !path.includes("/splash") && !path.includes("/setup")) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   },

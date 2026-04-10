@@ -98,12 +98,14 @@ export default function DashboardPage() {
           value={formatCurrency(stats?.today_sales ?? 0)}
           icon={<Receipt size={18} />}
           variant="info"
+          onClick={() => navigate(ROUTES.INVOICES)}
         />
         <StatCard
           label="Month Expense"
           value={formatCurrency(stats?.month_expenses ?? 0)}
           icon={<TrendingDown size={18} />}
           variant="warning"
+          onClick={() => navigate(ROUTES.EXPENSES)}
         />
       </div>
 

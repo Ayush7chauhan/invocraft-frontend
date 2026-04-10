@@ -244,10 +244,39 @@ export default function Reports({ onBack }: ReportsProps) {
   const [listData, setListData] = useState<ListItem[]>([]);
   const [listLoading, setListLoading] = useState(false);
 
-  const filterRange = useMemo(
-    () => getDateRangeForFilter(filterPeriod),
-    [filterPeriod],
-  );
+  // ── Advanced filters ─────────────────────────────────────────────────────────
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [useCustomRange, setUseCustomRange] = useState(false);
+  const [filterCustomerId, setFilterCustomerId] = useState<string>("");
+  const [filterTxType, setFilterTxType] = useState<"" | "credit" | "debit">("");
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<"" | "paid" | "unpaid" | "partially_paid">("");
+  const [customers, setCustomers] = useState<CustomerItem[]>([]);
+
+  // Fetch customer list once for the customer filter dropdown
+  useEffect(() => {
+    api.get("/parties", { params: { type: "customer" } }).then((res) => {
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        setCustomers(res.data.data as CustomerItem[]);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const filterRange = useMemo(() => {
+    if (useCustomRange && customStartDate && customEndDate) {
+      return { start_date: customStartDate, end_date: customEndDate };
+    }
+    return getDateRangeForFilter(filterPeriod);
+  }, [filterPeriod, useCustomRange, customStartDate, customEndDate]);
+
+  /** Build extra query params from advanced filters */
+  const advancedParams = useMemo(() => {
+    const p: Record<string, string> = {};
+    if (filterCustomerId) p.party_id = filterCustomerId;
+    if (filterTxType) p.type = filterTxType;
+    if (filterPaymentStatus) p.payment_status = filterPaymentStatus;
+    return p;
+  }, [filterCustomerId, filterTxType, filterPaymentStatus]);
 
   const fetchList = useCallback(
     async (type: NonNullable<ListType>) => {
@@ -270,12 +299,16 @@ export default function Reports({ onBack }: ReportsProps) {
             setListData(res.data.data as CustomerItem[]);
           }
         } else if (type === "transactions") {
-          const res = await api.get("/transactions", { params: range });
+          const res = await api.get("/transactions", {
+            params: { ...range, ...advancedParams },
+          });
           if (res.data?.success && Array.isArray(res.data.data)) {
             setListData(res.data.data as TransactionItem[]);
           }
         } else if (type === "invoices") {
-          const res = await api.get("/invoices", { params: range });
+          const res = await api.get("/invoices", {
+            params: { ...range, ...advancedParams },
+          });
           if (res.data?.success && Array.isArray(res.data.data)) {
             setListData(res.data.data as InvoiceItem[]);
           }
@@ -286,7 +319,7 @@ export default function Reports({ onBack }: ReportsProps) {
         setListLoading(false);
       }
     },
-    [filterRange],
+    [filterRange, advancedParams],
   );
 
   const handleCardClick = useCallback(
@@ -333,7 +366,9 @@ export default function Reports({ onBack }: ReportsProps) {
     setLoadingRange(true);
 
     try {
-      const res = await api.get("/reports/range", { params: filterRange });
+      const res = await api.get("/reports/range", {
+        params: { ...filterRange, ...advancedParams },
+      });
       if (res.data?.success && res.data.data) {
         setRangeData(res.data.data as ReportData);
       } else {
@@ -345,14 +380,16 @@ export default function Reports({ onBack }: ReportsProps) {
     } finally {
       setLoadingRange(false);
     }
-  }, [filterRange]);
+  }, [filterRange, advancedParams]);
 
   const fetchChartData = useCallback(async () => {
     setChartLoading(true);
     setChartError(null);
 
     try {
-      const res = await api.get("/reports/chart", { params: filterRange });
+      const res = await api.get("/reports/chart", {
+        params: { ...filterRange, ...advancedParams },
+      });
       if (res.data?.success && Array.isArray(res.data.data)) {
         setChartData(res.data.data as ChartPoint[]);
       } else {
@@ -365,7 +402,7 @@ export default function Reports({ onBack }: ReportsProps) {
     } finally {
       setChartLoading(false);
     }
-  }, [filterRange]);
+  }, [filterRange, advancedParams]);
 
   useEffect(() => {
     fetchOverview();
@@ -375,6 +412,11 @@ export default function Reports({ onBack }: ReportsProps) {
     fetchRangeData();
     fetchChartData();
   }, [fetchRangeData, fetchChartData]);
+
+  // Re-fetch active list when filters change
+  useEffect(() => {
+    if (selectedList) fetchList(selectedList);
+  }, [filterRange, advancedParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chartTotals = useMemo(() => {
     const sales = chartData.reduce((s, d) => s + d.total_sales, 0);
@@ -758,23 +800,119 @@ export default function Reports({ onBack }: ReportsProps) {
             Report by period
           </h2>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-              Filter: Date · Weekly · Monthly
-            </label>
+          {/* ── Period / Date range toggle ─────────────────────────── */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
+                Filter: Date Period
+              </label>
+              <button
+                type="button"
+                onClick={() => setUseCustomRange((v) => !v)}
+                className={`ml-auto text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                  useCustomRange
+                    ? "bg-green-600 text-white"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
+                }`}
+              >
+                {useCustomRange ? "Custom range" : "Preset period"}
+              </button>
+            </div>
+
+            {useCustomRange ? (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">From</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">To</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+              </div>
+            ) : (
+              <select
+                value={filterPeriod}
+                onChange={(e) => setFilterPeriod(e.target.value as FilterPeriodKey)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 dark:focus:ring-emerald-400/30 transition-all duration-200"
+              >
+                {FILTER_PERIOD_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* ── Advanced filters ─────────────────────────────────────── */}
+          <div className="mb-4 space-y-2">
+            {/* Customer filter */}
             <select
-              value={filterPeriod}
-              onChange={(e) =>
-                setFilterPeriod(e.target.value as FilterPeriodKey)
-              }
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 dark:focus:ring-emerald-400/30 transition-all duration-200"
+              value={filterCustomerId}
+              onChange={(e) => setFilterCustomerId(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
             >
-              {FILTER_PERIOD_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
+              <option value="">All Customers</option>
+              {customers.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.name}
                 </option>
               ))}
             </select>
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Transaction type */}
+              <select
+                value={filterTxType}
+                onChange={(e) => setFilterTxType(e.target.value as typeof filterTxType)}
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+              >
+                <option value="">All Types</option>
+                <option value="credit">Credit (In)</option>
+                <option value="debit">Debit (Out)</option>
+              </select>
+
+              {/* Payment status */}
+              <select
+                value={filterPaymentStatus}
+                onChange={(e) => setFilterPaymentStatus(e.target.value as typeof filterPaymentStatus)}
+                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+              >
+                <option value="">All Statuses</option>
+                <option value="paid">Paid</option>
+                <option value="unpaid">Unpaid</option>
+                <option value="partially_paid">Partial</option>
+              </select>
+            </div>
+
+            {/* Reset filters */}
+            {(filterCustomerId || filterTxType || filterPaymentStatus || useCustomRange) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterCustomerId("");
+                  setFilterTxType("");
+                  setFilterPaymentStatus("");
+                  setUseCustomRange(false);
+                  setCustomStartDate("");
+                  setCustomEndDate("");
+                }}
+                className="w-full py-2 text-xs text-red-600 dark:text-red-400 font-medium border border-red-200 dark:border-red-800 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                ✕ Clear all filters
+              </button>
+            )}
           </div>
 
           {loadingRange ? (

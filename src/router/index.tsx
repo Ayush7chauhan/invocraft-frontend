@@ -26,6 +26,10 @@ import Home from '@/pages/Home';
 import OTP from '@/pages/auth/OTP';
 import SetupShop from '@/pages/SetupShop';
 
+// ── Legal pages ───────────────────────────────────────────────────────────────
+import TermsPage   from '@/pages/legal/TermsPage';
+import PrivacyPage from '@/pages/legal/PrivacyPage';
+
 // ── New feature pages ─────────────────────────────────────────────────────────
 import DashboardPage from '@/features/dashboard/DashboardPage';
 import PartiesPage from '@/features/parties/PartiesPage';
@@ -34,6 +38,7 @@ import CategoriesPage from '@/features/categories/CategoriesPage';
 import UnitsPage from '@/features/units/UnitsPage';
 import InvoicesPage from '@/features/invoices/InvoicesPage';
 import CreateInvoicePage from '@/features/invoices/CreateInvoicePage';
+import ViewInvoicePage from '@/features/invoices/ViewInvoicePage';
 import PaymentsPage from '@/features/payments/PaymentsPage';
 import ExpensesPage from '@/features/expenses/ExpensesPage';
 import SettingsPage from '@/features/settings/SettingsPage';
@@ -158,10 +163,12 @@ const router = createBrowserRouter([
   { path: '/', element: <Navigate to="/splash" replace /> },
 
   // Public routes (no layout)
-  { path: '/splash', element: <SplashRoute /> },
-  { path: '/login', element: <LoginRoute /> },
-  { path: '/login/otp', element: <OTPRoute /> },
-  { path: '/setup', element: <SetupShopRoute /> },
+  { path: '/splash',     element: <SplashRoute /> },
+  { path: '/login',      element: <LoginRoute /> },
+  { path: '/login/otp',  element: <OTPRoute /> },
+  { path: '/setup',      element: <SetupShopRoute /> },
+  { path: '/terms',      element: <TermsPage /> },
+  { path: '/privacy',    element: <PrivacyPage /> },
 
   // Protected routes — ProtectedRoute checks token+user, AppLayout provides UI shell
   {
@@ -188,6 +195,7 @@ const router = createBrowserRouter([
           // Invoices
           { path: '/invoices', element: <InvoicesPage /> },
           { path: '/invoices/create', element: <CreateInvoicePage /> },
+          { path: '/invoices/:id', element: <ViewInvoicePage /> },
 
           // Payments
           { path: '/payments', element: <PaymentsPage /> },
